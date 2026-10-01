@@ -1,0 +1,24 @@
+{
+  "name": "my-pi-extension",
+  "version": "0.1.0",
+  "description": "One-line description of what this adds to Pi.",
+  "type": "module",
+  "license": "MIT",
+  "keywords": ["pi-package"],
+  "files": ["extensions/**/*.ts", "README.md", "LICENSE"],
+  "pi": {
+    "extensions": ["./extensions/my-extension.ts"]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  },
+  "peerDependenciesMeta": {
+    "@earendil-works/pi-coding-agent": { "optional": true }
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@earendil-works/pi-coding-agent": "*",
+    "@types/node": "^22",
+    "typescript": "^5"
+  }
+}
