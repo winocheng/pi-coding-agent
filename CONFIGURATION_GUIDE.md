@@ -26,9 +26,10 @@ This document walks through the full setup process for configuring the Pi coding
 11. [Set Up OpenSpec for Spec-Driven Planning](#11-set-up-openspec-for-spec-driven-planning)
 12. [Frontend Visual Loop: Browser Screenshots The Model Can See](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)
 13. [Update / Uninstall The Alibaba Extension](#13-update--uninstall-the-alibaba-extension)
-14. [Troubleshooting The Swap](#troubleshooting-the-swap)
-15. [Project-Local And Personal Skills](#project-local-and-personal-skills)
-16. [Summary](#summary)
+14. [Git Push Auth Under WSL](#git-push-auth-under-wsl)
+15. [Troubleshooting The Swap](#troubleshooting-the-swap)
+16. [Project-Local And Personal Skills](#project-local-and-personal-skills)
+17. [Summary](#summary)
 
 ---
 
@@ -519,6 +520,73 @@ The fork's own state files (all under `~/.pi/agent`, or `$PI_CODING_AGENT_DIR`):
 
 ---
 
+## Git Push Auth Under WSL
+
+WSL keeps its own git config and has no credentials of its own, so the first `git push` fails with:
+
+```text
+fatal: could not read Username for 'https://github.com': No such device or address
+```
+
+Rather than maintaining a second set of keys, let WSL borrow the credentials Git for Windows already
+stores. One login on either side then covers both.
+
+### Prerequisites (all on the Windows side)
+
+This only works if Windows is configured to hand credentials to Git Credential Manager. Four things
+must be true:
+
+| # | Requirement | Check from WSL |
+|---|---|---|
+| 1 | Git for Windows installed (it bundles GCM) | `ls "/mnt/c/Program Files/Git"` |
+| 2 | GCM set as the Windows credential helper — written by the Git for Windows installer, or by `git-credential-manager.exe configure` | `grep -A1 '^\[credential\]' "/mnt/c/Program Files/Git/etc/gitconfig"` → `helper = manager` |
+| 3 | A GitHub account already signed in on Windows | `"/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" github list` prints your login |
+| 4 | WSL interop enabled, so `.exe` files can run | `ls /proc/sys/fs/binfmt_misc/WSLInterop`, and no `[interop] enabled=false` in `/etc/wsl.conf` |
+
+> **Row 3 is the one people are missing.** If `github list` prints nothing, seed it **from Windows**:
+> run `git-credential-manager github login` in PowerShell, or simply `git push` once from Git Bash and
+> finish the browser sign-in. GCM then stores the token in **Windows Credential Manager**, visible as
+> `git:https://github.com` under `cmdkey /list`, and that vault is what WSL reads afterwards. Nothing
+> needs to be signed into from inside WSL.
+
+### Configure WSL
+
+```bash
+git config --global credential.helper \
+  '!"/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"'
+```
+
+> **The `!` prefix is not optional.** It tells git to run the value through a shell, which is what lets
+> the space in `Program Files` parse. A bare path is split on the first space and fails. Adjust the
+> path if Git lives elsewhere (Scoop, a custom install dir).
+
+### Verify
+
+```bash
+GIT_TERMINAL_PROMPT=0 git ls-remote origin refs/heads/main
+```
+
+`GIT_TERMINAL_PROMPT=0` forbids any interactive fallback, so a successful run proves the credential
+came from GCM rather than from a prompt you did not notice. Drop the variable once it works.
+
+### If it stops working
+
+| Symptom | Cause / fix |
+|---|---|
+| `No such device or address` returns | Helper unset, or the GCM path moved. Re-check with `ls "/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"` |
+| `git-credential-manager.exe github list` prints nothing | The Windows-side credential is gone (logout, vault cleanup, token revocation). Re-run `github login` on Windows |
+| A browser sign-in window opens on every push | Expired token. Complete the flow once; GCM re-caches it |
+| `git-credential-manager.exe: command not found` or exec error | Interop disabled. Check `/etc/wsl.conf` for `[interop] enabled=false`, then `wsl --shutdown` from Windows |
+| Push works from Windows but not WSL, no error | Windows git and WSL git are separate installs with separate configs — this section configures only the WSL one |
+
+> **Scope note.** This lets WSL git read your Windows credential vault for every HTTPS git operation,
+> including the `git clone` that Pi itself shells out to for `pi install git:…` sources, so a private
+> git-hosted package installs without further setup. That convenience crosses the WSL/Windows boundary:
+> if you want the two environments isolated, skip this and use a dedicated SSH key in `~/.ssh` instead
+> (`git config --global --unset credential.helper` to back it out).
+
+---
+
 ## Troubleshooting The Swap
 
 | Symptom | Cause / fix |
@@ -574,12 +642,17 @@ Personal skills load in every project. They are tracked under
 ---
 
 *Last updated: 2026-10-04 — added [step 12](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)
-(frontend visual loop: `agent-browser` + `pi-agent-browser-native` + `frontend-visual-loop` skill) and
-renumbered the Alibaba update/uninstall section to 13. Its claims were checked against the installed
+(frontend visual loop: `agent-browser` + `pi-agent-browser-native` + `frontend-visual-loop` skill, now
+tracked under `personal-skills/`), the untracked-but-verified
+[Git Push Auth Under WSL](#git-push-auth-under-wsl) section, and renumbered the Alibaba
+update/uninstall section to 13. Its claims were checked against the installed
 wrapper source (0.7.1: `MINIMUM_AGENT_BROWSER_VERSION` 0.35.0, target 0.38.1, inline attachment in
 `lib/results/presentation/artifacts.js`, tool list and `agent_browser_code` limits from its README) and
 against live `pi -p` runs on `qwen3.8-flash` under WSL2/Ubuntu 24.04, including an end-to-end test where
-a planted low-contrast bug was diagnosed from a screenshot and verified fixed.*
+a planted low-contrast bug was diagnosed from a screenshot and verified fixed. The git-auth section's
+prerequisites, GCM 2.9.0 command names, and the `pi install git:` clone path were each re-checked against
+`/mnt/c/Program Files/Git/etc/gitconfig`, `git-credential-manager --help`, `cmdkey /list`, and
+`package-manager.js` on this machine.*
 
 *Earlier — Alibaba provider switched from `npm:pi-alibaba-models` (upstream 1.1.1) to the
 maintained fork [`RarogCmex/pi-alibaba-models`](https://github.com/RarogCmex/pi-alibaba-models) 2.0.0,
