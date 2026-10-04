@@ -2,20 +2,33 @@
 
 This document walks through the full setup process for configuring the Pi coding agent with Alibaba Cloud models.
 
+> **Extension source changed (2026-10-04).** This guide previously installed the Alibaba provider with
+> `pi install npm:pi-alibaba-models`. That npm package is the **original upstream** release and has no
+> fork equivalent published — the maintained fork we now document,
+> [`RarogCmex/pi-alibaba-models`](https://github.com/RarogCmex/pi-alibaba-models), is installed from git.
+> If Pi is already configured with the npm package, do [step 3](#3-migrate-off-the-npm-package) first.
+
 ---
 
 ## Table of Contents
 
 1. [Install Pi](#1-install-pi)
 2. [Install the Alibaba Models Extension](#2-install-the-alibaba-models-extension)
-3. [Start Pi](#3-start-pi)
-4. [Configure Alibaba Cloud Domain](#4-configure-alibaba-cloud-domain)  
+3. [Migrate Off The npm Package](#3-migrate-off-the-npm-package)
+4. [Start Pi](#4-start-pi)
+5. [Configure Alibaba Cloud Domain](#5-configure-alibaba-cloud-domain)  
    *Optional — skip if using the default International endpoint*
-5. [Login with Alibaba Hong Kong API Key](#5-login-with-alibaba-hong-kong-api-key)
-6. [Configure Scoped Models](#6-configure-scoped-models)
-7. [Configure Web Search with Exa](#7-configure-web-search-with-exa)
-8. [Install the Ask-User-Question Extension](#8-install-the-ask-user-question-extension)
-9. [Set Up OpenSpec for Spec-Driven Planning](#9-set-up-openspec-for-spec-driven-planning)
+6. [Login with an Alibaba API Key](#6-login-with-an-alibaba-api-key)
+7. [Configure Scoped Models](#7-configure-scoped-models)
+8. [Optional: DashScope Sidecar And Image Tools](#8-optional-dashscope-sidecar-and-image-tools)
+9. [Configure Web Search with Exa](#9-configure-web-search-with-exa)
+10. [Install the Ask-User-Question Extension](#10-install-the-ask-user-question-extension)
+11. [Set Up OpenSpec for Spec-Driven Planning](#11-set-up-openspec-for-spec-driven-planning)
+12. [Frontend Visual Loop: Browser Screenshots The Model Can See](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)
+13. [Update / Uninstall The Alibaba Extension](#13-update--uninstall-the-alibaba-extension)
+14. [Troubleshooting The Swap](#troubleshooting-the-swap)
+15. [Project-Local And Personal Skills](#project-local-and-personal-skills)
+16. [Summary](#summary)
 
 ---
 
@@ -29,21 +42,97 @@ curl -fsSL https://pi.dev/install.sh | sh
 
 This installs the Pi coding agent CLI to your system.
 
+> **Version floor.** The Alibaba fork requires Pi **1.0.0 or newer** and refuses to start with a clear
+> diagnostic on older hosts (`pi --version` to check). The last fork release that runs on pre-1.0.0
+> hosts is 1.5.3.
+
 ---
 
 ## 2. Install the Alibaba Models Extension
 
-Install the `pi-alibaba-models` extension package via npm:
+Install the Alibaba provider from the maintained fork:
 
 ```bash
-pi install npm:pi-alibaba-models
+pi install git:github.com/RarogCmex/pi-alibaba-models
 ```
 
-This adds support for Alibaba Cloud (DashScope) models to Pi.
+Or from a local checkout (useful for pinning a commit or hacking on it):
+
+```bash
+git clone https://github.com/RarogCmex/pi-alibaba-models
+cd pi-alibaba-models && pi install .
+```
+
+> **The fork is never published to npm.** `pi install npm:pi-alibaba-models` and
+> `pi install pi-alibaba-models` both resolve the **original upstream** package, not this fork.
+
+Restart Pi in a **new session** after installing (more reliable than `/reload` for provider
+registration). On boot the extension registers two providers — `alibaba-plan` and `alibaba-cloud` —
+the `/alibaba` command, the DashScope sidecar tool (`alibaba_tools`), and image models/tools.
+
+Verify:
+
+```bash
+pi list                                     # the git source should appear, and npm:pi-alibaba-models should NOT
+pi --offline --list-models alibaba-cloud    # real model ids from the cached catalogue
+```
+
+### Why the fork instead of the npm package
+
+| | npm `pi-alibaba-models` (1.1.1) | fork (2.0.0) |
+|---|---|---|
+| Cloud wire format | `anthropic-messages` default, `openai-completions` selectable — **no Responses** | **OpenAI Responses by default**, auto-fallback to Chat Completions for models without Responses support, Anthropic still selectable |
+| Output budget | card `maxTokens` 8192 → only ~1024 tokens left for the answer at high thinking, so long replies are truncated mid-sentence with `stopReason: length` | uses the catalogue's real `max_output_tokens` (clamped at 131072) |
+| Endpoints | International / China | International / China / US-Virginia / Hong Kong / **workspace domains** / Custom |
+| API key swap | keeps the old key's endpoint — every request then fails `403` | endpoint **re-derived from the new key**: verified against shared regional defaults first, then upgraded to that key's own workspace domain |
+| Catalogue | static list shipped in the package | **live** Alibaba catalogue (`GET /api/v1/models`) plus an offline snapshot, so new models appear without an extension update |
+| Two installs at once | a stale npm copy silently overrides the newer one (no diagnostic) | **duplicate-install guard** — Pi refuses to start and names the copy to remove |
+| Extra capabilities | chat only | native thinking levels, vision, `alibaba_tools` sidecar (web search / extract / code interpreter / image search), DashScope image generation, per-model context-window override |
 
 ---
 
-## 3. Start Pi
+## 3. Migrate Off The npm Package
+
+Do this once if `pi list` shows `npm:pi-alibaba-models` (i.e. following step 2 above installed the git
+fork while the npm copy is still configured). Two copies register the same `alibaba-cloud` provider, and
+the fork's guard makes Pi fail at startup with:
+
+```
+pi-alibaba-models is installed 2 times; 1 of those would shadow this copy in the same pi process.
+```
+
+Remove the stale npm copy, then restart:
+
+```bash
+pi remove npm:pi-alibaba-models
+rm -rf ~/.pi/agent/npm/node_modules/pi-alibaba-models   # only if it lingers in `pi list`
+```
+
+`pi remove` edits `~/.pi/agent/settings.json` (`packages`) but leaves extension-private state behind,
+which is what you want here — the existing key and domain config carry over to the fork. To start from a
+clean slate instead, wipe the fork's state too (you will need to `/login` again):
+
+```bash
+rm -f ~/.pi/agent/alibaba-config.json ~/.pi/agent/alibaba-models.cache.json \
+      ~/.pi/agent/alibaba-catalog.lock* \
+      ~/.pi/agent/alibaba-plan-models.cache.json \
+      ~/.pi/agent/alibaba-cloud-models.cache*.json  # last glob: 1.4.x leftover
+# then remove the "alibaba-plan" / "alibaba-cloud" entries from ~/.pi/agent/auth.json
+# and drop any "alibaba-*/…" ids from enabledModels in ~/.pi/agent/settings.json
+```
+
+> Or, from inside a session, `/alibaba → Reset all` wipes config, both auth entries, the plan-model
+> cache and `alibaba-*` entries in `enabledModels` in one step.
+
+Finally confirm only one copy is configured:
+
+```bash
+pi list
+```
+
+---
+
+## 4. Start Pi
 
 Launch Pi by running:
 
@@ -55,51 +144,114 @@ This starts the interactive coding agent session.
 
 ---
 
-## 4. Configure Alibaba Cloud Domain (Optional)
+## 5. Configure Alibaba Cloud Domain
 
 > **Skip this step** if you are using the default International endpoint (`dashscope-intl.aliyuncs.com`).
->
-> This step is only needed if you want to switch to the **China** endpoint or a **Custom** workspace domain.
 
-Within the Pi session, run the Alibaba configuration command:
+Within the Pi session, run:
 
 ```
 /alibaba
 ```
 
-From the interactive menu, select **Cloud — Change Domain**. You will be presented with three options:
+Select **Cloud — Change Domain**. The fork offers four shared hosts, five workspace-domain builders,
+and a free-text Custom entry:
 
-| Option        | Domain                                         | Notes                                |
-|---------------|------------------------------------------------|--------------------------------------|
-| International | `dashscope-intl.aliyuncs.com`                  | Default — Singapore region           |
-| China         | `dashscope.aliyuncs.com`                       | Mainland China endpoint              |
-| Custom        | *(paste your own)*                             | For workspace-specific domains       |
+| Option | Domain |
+|---|---|
+| International | `dashscope-intl.aliyuncs.com` (default — Singapore) |
+| China | `dashscope.aliyuncs.com` (Beijing) |
+| US — Virginia | `dashscope-us.aliyuncs.com` |
+| Hong Kong | `cn-hongkong.dashscope.aliyuncs.com` |
+| Workspace — Beijing / Singapore / Tokyo / Frankfurt / US | `{WorkspaceId}.{region}.maas.aliyuncs.com` — you paste only your business-space ID and the menu builds the host |
+| Custom | *(paste your own)* |
 
-If you select **Custom**, enter your domain in the following format:
+Workspace regions are `cn-beijing`, `ap-southeast-1`, `ap-northeast-1`, `eu-central-1`, `us-east-1`.
+Alibaba recommends workspace domains, and they are **required** for Tokyo and Frankfurt (those regions
+have no shared host).
+
+> **Hong Kong workspace hosts.** `cn-hongkong` is *not* one of the fork's workspace regions, so a
+> `{WorkspaceId}.cn-hongkong.maas.aliyuncs.com` endpoint has to be entered through **Custom** — the menu
+> will not build it for you, and the workspace auto-upgrade below never touches it (nor any Custom host).
+> This is exactly the case for an existing `…​.cn-hongkong.maas.aliyuncs.com` config: it survives the
+> migration untouched and is read as a custom, key-independent domain.
+
+### Auto workspace-domain upgrade
+
+When the Cloud domain is one of the three shared regional hosts, the extension reads the WorkspaceId
+bound to your key from `GET /api/v1/models/limits`, probes `{WorkspaceId}.{region}.maas.aliyuncs.com`,
+and **only on a successful probe** switches the config to the workspace host. A failed probe changes
+nothing and retries at most once per 24 h. Manage it with **Cloud — Auto workspace domain**
+(detect now / enable / disable); picking a shared host explicitly in the menu counts as "stay here" and
+disables it. `/alibaba → Status` shows `Auto-WS` and the discovered WorkspaceId.
+
+### API format
+
+The fork defaults Cloud to **OpenAI Responses** (`/compatible-mode/v1/responses`). The format is pinned
+into `alibaba-config.json` on first boot, so an existing `"cloudApiFormat": "anthropic-messages"` entry
+(stale npm-era value) is **kept** rather than silently flipped. To move onto Responses:
 
 ```
-{your-workspace-id}.cn-hongkong.maas.aliyuncs.com
+/alibaba → Cloud — Change API Format → OpenAI Responses
 ```
 
-> **Note:** Replace `{your-workspace-id}` with your actual Alibaba Cloud workspace ID. The `cn-hongkong` region routes your requests through the Hong Kong endpoint.
+Per-model fallbacks stay automatic: a family whose capability row is not Responses-capable is routed to
+Chat Completions on its own (`kimi-k2.x`, `MiniMax-M2.5`, `glm-4.5`, bare `glm-5`/`glm-5.1`, and older
+DeepSeek/GLM/Kimi/MiniMax releases). 2.0.0 raised DeepSeek V4/V4.1, GLM-5.2/5.3, MiniMax-M2.1 and
+Kimi K3 onto Responses, so the set is much smaller than the 1.5.x release notes suggest — measured
+against this workspace's 26-id catalogue, **only `kimi-k2.7-code` falls back**. `/alibaba → Status`
+reports how many models fall back. With Responses active, requests carry
+`x-dashscope-session-cache: enable` — toggle it with **Cloud — Session Cache: On / Off** if your usage
+is one-shot-heavy (cache writes bill at 125 % of input, reads come back at ~10 %).
 
-You can also use this menu later to switch API format (Anthropic-compat vs OpenAI-compat), refresh model lists, or reset all state.
+> **Measured on this setup (2026-10-04, `openai-responses`, Hong Kong workspace domain, thinking
+> `high`, `qwen3.8-flash`):** a forced ~2,000-word answer completed with `stopReason: stop` at **5,920
+> output tokens** (10,246 characters of thinking, nothing truncated), and a third turn in the same
+> session read `cacheRead: 11,436` of a 11,718-token prompt (~97 %). The first follow-up turn can still
+> show `cacheRead: 0` while the server-side session cache warms up, so judge the cache over three turns
+> rather than two.
+>
+> **The truncation fix does not depend on this format switch.** The fork's real catalogue
+> `max_output_tokens` (131,072) leaves enough answer room even on `anthropic-messages` — measured there
+> too: 4,858 output tokens, `stopReason: stop`. Responses is preferred because thinking and the answer
+> do not share one `max_tokens` budget at all, and because session-cache reads are cheaper than the
+> implicit Anthropic-path cache.
+
+Other entries in the same menu: `Status`, `Refresh model lists`, `Re-login Plan` / `Re-login Cloud`,
+`Plan — Change Endpoints`, `Tools — Exposure`, `Tools — Sidecar model`, `Image — Default model`,
+`Rate limits (Cloud)`, `Cloud — Authorized-only Filter`, `Context Window — Override`, `Reset all`.
 
 ---
 
-## 5. Login with Alibaba Hong Kong API Key
-
-Authenticate with your Alibaba Cloud API key:
+## 6. Login with an Alibaba API Key
 
 ```
 /login
 ```
 
-Select the **Alibaba Hong Kong** provider and enter your API key when prompted.
+Pick the entry matching your account type — there is **no "Alibaba Hong Kong" provider**; the region is
+a Cloud *domain* setting (step 5), not a provider:
+
+| Account | `/login` section | Provider entry | Provider id | Token shape |
+|---|---|---|---|---|
+| Pay-per-token DashScope | **Use an API key** | Alibaba Cloud (API Key) | `alibaba-cloud` | `sk-…` |
+| Model Studio Coding Plan subscription | **Plans** | Alibaba Model Studio Coding Plan | `alibaba-plan` | `sk-sp-…` / `sk-tok-…` |
+
+Both providers register side by side, so you can switch per chat from the model picker.
+
+> **Cloud without `/login`:** the Cloud provider also reads the `DASHSCOPE_API_KEY` environment
+> variable. If it is set, the live catalogue is fetched from it on startup and no login step is needed.
+
+> **Pasted the wrong token shape?** The login validators catch it and offer to redirect you. To redo a
+> provider manually: `/alibaba → Re-login Cloud` (or `Re-login Plan`), then `/login` again.
+
+Replacing the Cloud key **re-derives the endpoint from scratch** (shared default first, then the new
+key's own workspace domain), so a stale workspace host can no longer `403` a fresh key. Use
+`Re-login Cloud` to clear the key binding and force that re-derivation immediately.
 
 ---
 
-## 6. Configure Scoped Models
+## 7. Configure Scoped Models
 
 Enable the Alibaba models used for model cycling:
 
@@ -107,7 +259,14 @@ Enable the Alibaba models used for model cycling:
 /scoped-models
 ```
 
-The three enabled models (stored as `enabledModels` in `~/.pi/agent/settings.json`):
+The fork serves a **live catalogue**, so model ids come from Alibaba rather than from a list baked into
+the package. Confirm real ids before editing settings by hand:
+
+```bash
+pi --offline --list-models alibaba-cloud     # cached snapshot, zero network
+```
+
+The three enabled models for this setup (stored as `enabledModels` in `~/.pi/agent/settings.json`):
 
 | Model | Setting entry |
 |-------|---------------|
@@ -115,9 +274,52 @@ The three enabled models (stored as `enabledModels` in `~/.pi/agent/settings.jso
 | Qwen 3.8 Max | `alibaba-cloud/qwen3.8-max` |
 | Qwen 3.7 Plus | `alibaba-cloud/qwen3.7-plus` |
 
-These are what `Ctrl+P` cycles through.
+These are what `Ctrl+P` cycles through. The provider id prefix (`alibaba-cloud/`) is unchanged from the
+npm package, so existing `enabledModels` entries carry over — but a stale id left in `enabledModels` can
+now be pruned automatically by `/alibaba → Reset all`, and new catalogue ids (`qwen3.6-*`, DeepSeek V4,
+Kimi K2.6, GLM-5, MiniMax M2.5, …) are available without any extension update.
 
-## 7. Configure Web Search with Exa
+If a newly shipped model does not appear:
+
+```
+/alibaba → Refresh model lists
+```
+
+---
+
+## 8. Optional: DashScope Sidecar And Image Tools
+
+The fork registers two extra tools, each with its own **exposure** (`/alibaba → Tools — Exposure`):
+
+| Exposure | Meaning |
+|---|---|
+| `codemode` (default) | callable from `codemode` scripts under the `alibaba` namespace; **not** declared to the model every turn |
+| `direct` | declared to the model on every turn (the old npm behaviour for `alibaba_tools`) |
+| `deferred` | reachable through `tool_search` instead |
+| `off` | not registered at all |
+
+| Tool | What it does |
+|---|---|
+| `alibaba_tools` | one tool for live web search, page extract, code interpreter, image search. Cloud key required; billed separately. |
+| `alibaba_image` | DashScope image generation/editing with every generation parameter (`model`, `size`, `n`, `seed`, `negative_prompt`, `prompt_extend`, `save`, …). Cloud only — Plan accounts register no image models. |
+
+Because the 2.0.0 default changed from `direct` to `codemode`, a setup that wants the model to call the
+sidecar directly must set it explicitly:
+
+```
+/alibaba → Tools — Exposure → alibaba_tools → direct
+```
+
+With both tools left at `codemode` and `codemode` disabled in Pi, neither is reachable and the only
+generation path is `/alibaba image <prompt>`.
+
+```text
+/alibaba image a red fox in the snow --model qwen-image-max --size 1664*928 --save fox.png
+```
+
+---
+
+## 9. Configure Web Search with Exa
 
 Add the Exa API key to your shell configuration:
 
@@ -134,13 +336,19 @@ Then install the web access extension:
 pi install npm:pi-web-access
 ```
 
-Restart Pi for the extension to load its tools. The `EXA_API_KEY` environment variable will enable Exa-powered web search.
+Restart Pi for the extension to load its tools. The `EXA_API_KEY` environment variable will enable
+Exa-powered web search.
 
-> **Note:** `/reload` may not be sufficient — start a new session for the extension tools to register properly.
+> **Note:** `/reload` may not be sufficient — start a new session for the extension tools to register
+> properly.
+>
+> **Overlap:** the Alibaba fork ships its own web search (`alibaba_tools`), billed on the DashScope
+> sidecar. Keep Exa if you want provider-independent search; drop `pi-web-access` if you would rather
+> pay for one search path only.
 
 ---
 
-## 8. Install the Ask-User-Question Extension
+## 10. Install the Ask-User-Question Extension
 
 Install the `ask_user_question` tool extension:
 
@@ -148,11 +356,13 @@ Install the `ask_user_question` tool extension:
 pi install npm:@juicesharp/rpiv-ask-user-question
 ```
 
-This gives the model a structured way to ask clarifying questions during a task: a terminal dialog with up to four questions and selectable options. The model calls it when instructions are ambiguous instead of guessing. No configuration needed — restart the session after installing.
+This gives the model a structured way to ask clarifying questions during a task: a terminal dialog with
+up to four questions and selectable options. The model calls it when instructions are ambiguous instead
+of guessing. No configuration needed — restart the session after installing.
 
 ---
 
-## 9. Set Up OpenSpec for Spec-Driven Planning
+## 11. Set Up OpenSpec for Spec-Driven Planning
 
 Install OpenSpec globally (requires Node.js 20.19.0+; Pi bundles a compatible Node on PATH):
 
@@ -166,9 +376,11 @@ From the project root, initialise OpenSpec for Pi:
 openspec init --tools pi --no-animation
 ```
 
-This writes six Pi slash commands under `.pi/prompts/opsx-*.md` and six matching skills under `.pi/skills/openspec-*/SKILL.md` — `explore`, `propose`, `apply`, `update`, `sync`, `archive`.
+This writes six Pi slash commands under `.pi/prompts/opsx-*.md` and six matching skills under
+`.pi/skills/openspec-*/SKILL.md` — `explore`, `propose`, `apply`, `update`, `sync`, `archive`.
 
-Then edit the generated `openspec/config.yaml` and replace the commented-out `context:` placeholder with a short project description so proposals fit this docs-only repo:
+Then edit the generated `openspec/config.yaml` and replace the commented-out `context:` placeholder with
+a short project description so proposals fit this docs-only repo.
 
 ```yaml
 schema: spec-driven
@@ -181,16 +393,163 @@ context: |
   Markdown guides. Never assume a package manager or CI exists here.
 ```
 
-See `OPENSPEC_GUIDE.md` for the full workflow.
+See [`GREENFIELD_GUIDE.md`](./GREENFIELD_GUIDE.md) for the umbrella-change workflow used to start a
+project from nothing with OpenSpec.
 
 ---
 
-## Project-Local Skills
+## 12. Frontend Visual Loop: Browser Screenshots The Model Can See
 
-This repository also ships two skills under `.pi/skills/`, loaded automatically when working in this project (no install step):
+Pi can only fix a layout it can see. This setup gives the model a real browser whose screenshots
+arrive as **image content inside the tool result**, so after editing a component it looks at the
+rendered page instead of guessing from source. Pi's tool contract already allows it —
+`AgentToolResult.content` is `(TextContent | ImageContent)[]`, documented as "Text or image content
+returned to the model" — so this is a supported path, not a workaround.
+
+Two pieces, one for capability and one for judgement:
+
+| Piece | Contributes |
+|---|---|
+| `pi-agent-browser-native` | the `agent_browser` tool — drives the `agent-browser` CLI and attaches screenshots inline |
+| `frontend-visual-loop` skill | when to capture, which viewports, and the WSL traps |
+
+### Install the CLI on the Linux side
+
+```bash
+npm install -g agent-browser
+agent-browser install --with-deps
+```
+
+> **Install inside WSL, not through Windows npm.** A `/mnt/c/...` install runs the CLI over interop
+> while Chrome for Testing runs natively, so relative paths resolve against the long-lived daemon's
+> launch directory and screenshots land in the wrong folder. Confirm with
+> `which -a agent-browser` — the `~/.local/share/pi-node/...` entry must come first.
+
+`agent-browser install --with-deps` downloads Chrome for Testing to `~/.agent-browser/browsers/` and
+installs the Linux system libraries it needs. It runs headless (`--headless=new` with SwiftShader),
+so no display server is involved.
+
+### Install the Pi package
+
+```bash
+pi install npm:pi-agent-browser-native
+pi list
+```
+
+The wrapper enforces an upstream CLI floor of **0.35.0** (target **0.38.1**) and refuses to run
+against older CLIs. On this machine the first package call auto-upgraded 0.27.0 → 0.38.1.
+
+> **Version note.** On Node 22 npm resolves **0.7.1**, not the latest 0.9.x, because 0.9 declares
+> `engines.node >=24.21.0`. 0.7.1 has the same inline-image attachment, so the visual loop works
+> unchanged; upgrade Node past 24.21 only if you want the newer wrapper.
+
+### Tools
+
+| Tool | Notes |
+|---|---|
+| `agent_browser` | main entry. `args` are 1:1 with the CLI (`open`, `screenshot`, `snapshot -i`, `set viewport`, `console`, `errors`, `eval`, `diff`, `vitals`, …). Use `batch` to fold a whole checkpoint into one call |
+| `agent_browser_code` | bounded JavaScript over the same browser for loops and branches. Limits: 25 calls, 120 s default, ≤8 images / 20 MiB total, 5 MiB per image |
+| `agent_browser_tools` | lists and enables the specialized tools (`agent_browser_action`, `_qa`, `_electron`, `_source`, `_network_source`). Inactive until enabled |
+| `agent_browser_web_search` | appears only when an Exa or Brave key resolves — already satisfied by [step 9](#9-configure-web-search-with-exa). Prefer it over automating Google, which serves CAPTCHAs to headless Chrome |
+
+### The skill
+
+Tracked in this repo at [`personal-skills/frontend-visual-loop/`](./personal-skills/README.md) and
+symlinked into the personal skills directory, so it stays personal-scope (following you into every
+frontend repo) while remaining version-controlled with the repo as the single source of truth:
+
+```bash
+ln -s "$PWD/personal-skills/frontend-visual-loop" ~/.pi/agent/skills/frontend-visual-loop
+```
+
+Pi's loader follows symlinked skill directories, so no copy or sync step is needed and the bundled
+script keeps its executable bit. It auto-triggers on UI edits and phrasing like
+"looks wrong", "is invisible", "check the page", "responsive check", and can be forced with
+`/skill:frontend-visual-loop`. It encodes:
+
+- screenshot **before** editing to confirm the symptom, and **after** to confirm the fix
+- a 390×844 / 768×1024 / 1280×800 viewport matrix — desktop-only checks miss the common defects
+- `console` + `errors --json` alongside every capture, because a page can look fine and still throw
+- absolute artifact paths, and closing the browser at the end
+- `scripts/viewport-sweep.sh` for a three-viewport capture in one command
+
+> **Screenshots are not free.** Images stay in the transcript and are re-sent on every later request,
+> so the skill captures at decision points rather than after each edit. There is deliberately no
+> auto-screenshot hook on `tool_call`; if you want one, pair it with a `context` handler that drops
+> stale images first.
+
+### Gotchas verified on this machine
+
+| Symptom | Cause / fix |
+|---|---|
+| All-white screenshot that looks like a broken app | Stale `agent-browser` daemons (left from a deleted cwd, or a Windows-side copy) split `open` and `screenshot` across browsers. Confirm with `get url` after `open`; recover with `agent-browser close --all`, `pkill -f 'agent-[b]rowser-linux'`, then `agent-browser doctor` |
+| `[agent-browser] launched browser` repeats on every call | Same cause — sessions are not being reused |
+| Screenshot written to the repo root instead of the target dir | CLI running over Windows interop; reinstall on the Linux side |
+| `errors` prints a bare `✗` | Plain formatter drops multi-line stacks. Add `--json` |
+| Google/httpbin return a consent wall | Expected anti-bot response from headless Chrome. Local dev servers are unaffected |
+| Model describes nothing although a screenshot was returned | Vision must be enabled. `models-store.json` lists `qwen3.8-flash` as `input: ["text","image"]`, but `alibaba-cloud-models.cache.json` says `["text"]`; the store wins. If images stop being read, check the active model's `input` array |
+
+---
+
+## 13. Update / Uninstall The Alibaba Extension
+
+`pi update` re-fetches the git source:
+
+```bash
+pi update git:github.com/RarogCmex/pi-alibaba-models
+```
+
+> **`pi remove` does not clean extension-private state** — auth entries, `alibaba-config.json`, catalog
+> caches and `alibaba-*` ids in `enabledModels` all survive it. For a clean uninstall:
+
+```text
+1. /alibaba  →  "Reset all"   (wipes config, both auth entries, plan-models cache, alibaba-* enabledModels)
+2. pi remove git:github.com/RarogCmex/pi-alibaba-models
+```
+
+The fork's own state files (all under `~/.pi/agent`, or `$PI_CODING_AGENT_DIR`):
+
+| Path | Purpose |
+|---|---|
+| `auth.json` | both provider credentials (0600) — shared with Pi, delete only the `alibaba-plan` / `alibaba-cloud` keys |
+| `alibaba-config.json` | domain, API format, toggles, exposure, key fingerprint, catalog fetch timestamps |
+| `alibaba-models.cache.json` | versioned catalog snapshot used to seed boot with zero network |
+| `alibaba-catalog.lock` | transient fetch lock |
+| `models-store.json` | Pi-owned, shared across providers — the extension's rows there are a bonus channel |
+
+---
+
+## Troubleshooting The Swap
+
+| Symptom | Cause / fix |
+|---|---|
+| `pi-alibaba-models is installed 2 times; 1 of those would shadow this copy` | npm copy and git copy both configured. Run `pi remove` naming the copy in the error (usually `npm:pi-alibaba-models`) and restart. `PI_ALIBABA_ALLOW_DUPLICATE=1` boots anyway (only useful when comparing versions deliberately). |
+| Long replies cut off mid-sentence, `stopReason: length` (and, downstream, `Context overflow recovery failed: Summarization failed: generation hit the token cap…` at a nearly empty context) | The classic npm-1.1.1 symptom: its hardcoded card `maxTokens: 8192` is split by pi's Anthropic path between thinking (7,168) and answer (~1,024), so anything longer stops with `length`. Because `isRecoverableLength()` only checks `output < maxTokens`, pi misreads that as context pressure and runs overflow recovery — whose summary call gets the same ~1,024-token answer room and fails too. Fix: install the fork (real `max_output_tokens`). Moving Cloud to `openai-responses` helps further, since thinking and answer then share no budget at all. |
+| Every request returns `403` after changing the API key | Old behaviour: endpoint inherited from the previous key. The fork re-derives it; run `/alibaba → Re-login Cloud` then `/login`. |
+| `/alibaba` command missing | `pi list` shows the package? If not, reinstall and restart Pi in a new session. |
+| Model picker shows "No matching models" | Not logged in yet — models register only after a successful Cloud/Plan login (or with `$DASHSCOPE_API_KEY` set). |
+| New model not listed | `/alibaba → Refresh model lists` (force, always fetches). |
+| Wrong context window on a brand-new model | `/alibaba → Context Window — Override` (per model, or `*` for all). |
+| `429 InternalError.Algo … Too many requests` / `Backend buffer overflow` | DashScope wraps rate limits inside a 200 SSE error event; chat auto-retries, `alibaba_tools` retries in the tool card. RPM windows reset in ~60 s; check `/alibaba → Rate limits (Cloud)`. |
+| `alibaba_tools` missing | Exposure is `off` — `/alibaba → Tools — Exposure → alibaba_tools → codemode` (or `direct`), then restart. Needs a Cloud key. |
+
+---
+
+## Project-Local And Personal Skills
+
+This repository also ships two skills under `.pi/skills/`, loaded automatically when working in this
+project (no install step):
 
 - **pi-extension-authoring** — designing, writing, and debugging Pi extensions
 - **pi-skill-authoring** — authoring and reviewing Agent Skills (SKILL.md files)
+
+Personal skills load in every project. They are tracked under
+[`personal-skills/`](./personal-skills/README.md) and symlinked into `~/.pi/agent/skills/`:
+
+- **frontend-visual-loop** — browser screenshots the model can see during frontend work
+  ([step 12](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)). Copy it into
+  `.pi/skills/` instead to scope it to one repo — not both, since a name collision keeps the
+  first-discovered copy and warns on every start.
 
 ---
 
@@ -198,16 +557,33 @@ This repository also ships two skills under `.pi/skills/`, loaded automatically 
 
 | Step | Command / Action | Purpose |
 |------|-----------------|---------|
-| 1 | `curl -fsSL https://pi.dev/install.sh \| sh` | Install Pi CLI |
-| 2 | `pi install npm:pi-alibaba-models` | Add Alibaba model support |
-| 3 | `pi` | Start Pi coding agent |
-| 4 | `/alibaba` → **Cloud — Change Domain** → Custom → `{workspace-id}.cn-hongkong.maas.aliyuncs.com` | Set custom API domain (optional) |
-| 5 | `/login` with Alibaba HK API key | Authenticate |
-| 6 | `/scoped-models` → `qwen3.8-flash`, `qwen3.8-max`, `qwen3.7-plus` | Configure scoped models |
-| 7 | Add `EXA_API_KEY` to `~/.bashrc` + `pi install npm:pi-web-access` | Configure web search with Exa |
-| 8 | `pi install npm:@juicesharp/rpiv-ask-user-question` | Install ask-user-question tool |
-| 9 | `npm install -g @fission-ai/openspec@latest` → `openspec init --tools pi --no-animation` → edit `openspec/config.yaml` `context:` block | Add spec-driven planning (`/opsx-propose` → `/opsx-apply` → `/opsx-archive`) |
+| 1 | `curl -fsSL https://pi.dev/install.sh \| sh` | Install Pi CLI (needs >= 1.0.0 for the fork) |
+| 2 | `pi install git:github.com/RarogCmex/pi-alibaba-models` | Add Alibaba model support (fork; no npm release) |
+| 3 | `pi remove npm:pi-alibaba-models` | Drop the stale npm copy so the guard doesn't block boot |
+| 4 | `pi` | Start Pi coding agent (new session, not `/reload`) |
+| 5 | `/alibaba` → **Cloud — Change Domain** → International / China / US / Hong Kong / workspace / Custom | Set the Cloud endpoint (optional) |
+| 6 | `/login` → **Use an API key → Alibaba Cloud (API Key)**, or **Plans → Alibaba Model Studio Coding Plan** | Authenticate |
+| 7 | `/scoped-models` → `qwen3.8-flash`, `qwen3.8-max`, `qwen3.7-plus` | Configure scoped models |
+| 8 | `/alibaba` → **Tools — Exposure** / **Cloud — Change API Format** | Opt into sidecar tools, image tools, Responses format |
+| 9 | Add `EXA_API_KEY` to `~/.bashrc` + `pi install npm:pi-web-access` | Configure web search with Exa |
+| 10 | `pi install npm:@juicesharp/rpiv-ask-user-question` | Install ask-user-question tool |
+| 11 | `npm install -g @fission-ai/openspec@latest` → `openspec init --tools pi --no-animation` → edit `openspec/config.yaml` `context:` block | Add spec-driven planning (`/opsx-propose` → `/opsx-apply` → `/opsx-archive`) |
+| 12 | `npm install -g agent-browser` + `agent-browser install --with-deps` + `pi install npm:pi-agent-browser-native` + symlink `personal-skills/frontend-visual-loop` into `~/.pi/agent/skills/` | Let the model see rendered UI while fixing frontends |
+| 13 | `pi update git:github.com/RarogCmex/pi-alibaba-models` | Keep the fork current |
 
 ---
 
-*Last updated: 2026-10-01*
+*Last updated: 2026-10-04 — added [step 12](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)
+(frontend visual loop: `agent-browser` + `pi-agent-browser-native` + `frontend-visual-loop` skill) and
+renumbered the Alibaba update/uninstall section to 13. Its claims were checked against the installed
+wrapper source (0.7.1: `MINIMUM_AGENT_BROWSER_VERSION` 0.35.0, target 0.38.1, inline attachment in
+`lib/results/presentation/artifacts.js`, tool list and `agent_browser_code` limits from its README) and
+against live `pi -p` runs on `qwen3.8-flash` under WSL2/Ubuntu 24.04, including an end-to-end test where
+a planted low-contrast bug was diagnosed from a screenshot and verified fixed.*
+
+*Earlier — Alibaba provider switched from `npm:pi-alibaba-models` (upstream 1.1.1) to the
+maintained fork [`RarogCmex/pi-alibaba-models`](https://github.com/RarogCmex/pi-alibaba-models) 2.0.0,
+with Cloud set to `openai-responses`. Menu labels, domain/workspace options, capability table and state
+file names below were re-checked against the installed fork source and `pi --offline --list-models`, and
+the truncation and session-cache claims against live `pi -p --mode json` runs on `qwen3.8-flash` with
+thinking `high`.*
