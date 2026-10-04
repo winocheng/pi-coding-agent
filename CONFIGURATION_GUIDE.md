@@ -6,30 +6,31 @@ This document walks through the full setup process for configuring the Pi coding
 > `pi install npm:pi-alibaba-models`. That npm package is the **original upstream** release and has no
 > fork equivalent published — the maintained fork we now document,
 > [`RarogCmex/pi-alibaba-models`](https://github.com/RarogCmex/pi-alibaba-models), is installed from git.
-> If Pi is already configured with the npm package, do [step 3](#3-migrate-off-the-npm-package) first.
+> If Pi is already configured with the npm package, do [step 4](#4-migrate-off-the-npm-package) first.
 
 ---
 
 ## Table of Contents
 
 1. [Install Pi](#1-install-pi)
-2. [Install the Alibaba Models Extension](#2-install-the-alibaba-models-extension)
-3. [Migrate Off The npm Package](#3-migrate-off-the-npm-package)
-4. [Start Pi](#4-start-pi)
-5. [Configure Alibaba Cloud Domain](#5-configure-alibaba-cloud-domain)  
+2. [Node.js And npm Under WSL](#2-nodejs-and-npm-under-wsl)
+3. [Install the Alibaba Models Extension](#3-install-the-alibaba-models-extension)
+4. [Migrate Off The npm Package](#4-migrate-off-the-npm-package)
+5. [Start Pi](#5-start-pi)
+6. [Configure Alibaba Cloud Domain](#6-configure-alibaba-cloud-domain)  
    *Optional — skip if using the default International endpoint*
-6. [Login with an Alibaba API Key](#6-login-with-an-alibaba-api-key)
-7. [Configure Scoped Models](#7-configure-scoped-models)
-8. [Optional: DashScope Sidecar And Image Tools](#8-optional-dashscope-sidecar-and-image-tools)
-9. [Configure Web Search with Exa](#9-configure-web-search-with-exa)
-10. [Install the Ask-User-Question Extension](#10-install-the-ask-user-question-extension)
-11. [Set Up OpenSpec for Spec-Driven Planning](#11-set-up-openspec-for-spec-driven-planning)
-12. [Frontend Visual Loop: Browser Screenshots The Model Can See](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)
-13. [Update / Uninstall The Alibaba Extension](#13-update--uninstall-the-alibaba-extension)
-14. [Git Push Auth Under WSL](#git-push-auth-under-wsl)
-15. [Troubleshooting The Swap](#troubleshooting-the-swap)
-16. [Project-Local And Personal Skills](#project-local-and-personal-skills)
-17. [Summary](#summary)
+7. [Login with an Alibaba API Key](#7-login-with-an-alibaba-api-key)
+8. [Configure Scoped Models](#8-configure-scoped-models)
+9. [Optional: DashScope Sidecar And Image Tools](#9-optional-dashscope-sidecar-and-image-tools)
+10. [Configure Web Search with Exa](#10-configure-web-search-with-exa)
+11. [Install the Ask-User-Question Extension](#11-install-the-ask-user-question-extension)
+12. [Set Up OpenSpec for Spec-Driven Planning](#12-set-up-openspec-for-spec-driven-planning)
+13. [Frontend Visual Loop: Browser Screenshots The Model Can See](#13-frontend-visual-loop-browser-screenshots-the-model-can-see)
+14. [Update / Uninstall The Alibaba Extension](#14-update--uninstall-the-alibaba-extension)
+15. [Git Push Auth Under WSL](#git-push-auth-under-wsl)
+16. [Troubleshooting The Swap](#troubleshooting-the-swap)
+17. [Project-Local And Personal Skills](#project-local-and-personal-skills)
+18. [Summary](#summary)
 
 ---
 
@@ -49,7 +50,77 @@ This installs the Pi coding agent CLI to your system.
 
 ---
 
-## 2. Install the Alibaba Models Extension
+## 2. Node.js And npm Under WSL
+
+Pi bundles its own Node.js and puts it first on `PATH`, so inside a Pi session `node`, `npm`, and `npx`
+all resolve to Pi's copy. A plain terminal does **not** inherit that: on a fresh shell `node` falls back
+to the old apt build (v18, which ships no `npm` at all), and `npm` may resolve to a Windows-side copy
+over interop. That mismatch is the root of most "why did this install land somewhere weird" confusion,
+so make Pi's Node the default everywhere.
+
+### What is actually installed here
+
+| Node | Version | Where | Notes |
+|---|---|---|---|
+| Pi-managed (recommended) | v22.23.3 | `~/.local/share/pi-node/current/bin` | Installed by the Pi installer; satisfies Pi's `>=22.19.0` floor; `npm prefix` points here |
+| apt `nodejs` | v18.19.1 | `/usr/bin/node` | Outdated and ships no npm — shadow or remove it |
+| Windows (nvm4w / Program Files) | v22.13.1 | `/mnt/c/...` | Reachable only via interop; do not use it for WSL work |
+
+### Make Pi's Node the default
+
+Pi's launcher prepends `~/.local/share/pi-node/current/bin` to `PATH` only for the `pi` process. Add the
+same line to your shell profile so every terminal agrees:
+
+```bash
+cat << 'EOF' >> ~/.bashrc
+
+# Use Pi's bundled Node.js as the default node/npm (matches what pi itself runs on)
+export PATH="$HOME/.local/share/pi-node/current/bin:$PATH"
+EOF
+source ~/.bashrc
+```
+
+Verify in a **new** terminal:
+
+```bash
+node --version          # v22.23.3
+npm --version           # 10.x
+which -a node           # pi-node first, then /usr/bin/node
+npm config get prefix   # ~/.local/share/pi-node/...
+```
+
+Now `npm install -g <tool>` (agent-browser, openspec, …) lands in Pi's Node tree and on `PATH`, and
+`pi install npm:…` resolves packages against the same Node — so what you install is what Pi runs.
+
+> **Interactive shells only.** `.bashrc` is read by interactive terminals; non-interactive shells
+> (scripts, cron, `bash -c`) skip it via the standard `case $-` guard near the top of the file. Pi's
+> own installs are unaffected — the launcher prepends Pi's Node inside the `pi` process — but if a
+> script invokes `npm` directly, add the same `export` to `~/.profile` as well.
+
+> **Why not nvm?** Microsoft's WSL guidance recommends a version manager, and nvm is the right tool if
+> you do general Node development across many versions. But Pi already ships and pins its own Node, and
+> Pi always runs on that copy regardless of nvm. For a Pi-centric setup, letting Pi's Node be the
+> default is simpler and avoids two managers fighting over `PATH`. Install nvm only for non-Pi projects
+> that need a different version — and keep Pi's Node ahead of it on `PATH`.
+
+> **The version floor matters.** Pi requires Node `>=22.19.0`, and its package manager resolves packages
+> against that Node. A package that declares a newer engine (for example one needing Node 24) is
+> deliberately installed at the newest version that runs under Pi's Node — that is correct behaviour,
+> not a bug. Upgrading Node on your own will not make Pi use it; Pi runs on its bundled copy.
+
+### Clean up the strays (optional)
+
+- **apt Node** is outdated and ships no npm. Once Pi's Node is first on `PATH` it is harmless but
+  confusing; remove it with `sudo apt remove nodejs` if nothing else depends on it
+  (`apt-cache rdepends --installed nodejs`).
+- **Windows Node** (`/mnt/c/nvm4w`, `/mnt/c/Program Files/nodejs`) leaks into WSL `PATH` because
+  `appendWindowsPath` defaults to true. Leave it for Windows-side tools; Pi's Node wins on `PATH` order
+  so it will not interfere. Setting `appendWindowsPath=false` in `/etc/wsl.conf` removes the clutter but
+  also hides other Windows executables — only do that deliberately.
+
+---
+
+## 3. Install the Alibaba Models Extension
 
 Install the Alibaba provider from the maintained fork:
 
@@ -92,9 +163,9 @@ pi --offline --list-models alibaba-cloud    # real model ids from the cached cat
 
 ---
 
-## 3. Migrate Off The npm Package
+## 4. Migrate Off The npm Package
 
-Do this once if `pi list` shows `npm:pi-alibaba-models` (i.e. following step 2 above installed the git
+Do this once if `pi list` shows `npm:pi-alibaba-models` (i.e. following step 3 above installed the git
 fork while the npm copy is still configured). Two copies register the same `alibaba-cloud` provider, and
 the fork's guard makes Pi fail at startup with:
 
@@ -133,7 +204,7 @@ pi list
 
 ---
 
-## 4. Start Pi
+## 5. Start Pi
 
 Launch Pi by running:
 
@@ -145,7 +216,7 @@ This starts the interactive coding agent session.
 
 ---
 
-## 5. Configure Alibaba Cloud Domain
+## 6. Configure Alibaba Cloud Domain
 
 > **Skip this step** if you are using the default International endpoint (`dashscope-intl.aliyuncs.com`).
 
@@ -224,14 +295,14 @@ Other entries in the same menu: `Status`, `Refresh model lists`, `Re-login Plan`
 
 ---
 
-## 6. Login with an Alibaba API Key
+## 7. Login with an Alibaba API Key
 
 ```
 /login
 ```
 
 Pick the entry matching your account type — there is **no "Alibaba Hong Kong" provider**; the region is
-a Cloud *domain* setting (step 5), not a provider:
+a Cloud *domain* setting (step 6), not a provider:
 
 | Account | `/login` section | Provider entry | Provider id | Token shape |
 |---|---|---|---|---|
@@ -252,7 +323,7 @@ key's own workspace domain), so a stale workspace host can no longer `403` a fre
 
 ---
 
-## 7. Configure Scoped Models
+## 8. Configure Scoped Models
 
 Enable the Alibaba models used for model cycling:
 
@@ -288,7 +359,7 @@ If a newly shipped model does not appear:
 
 ---
 
-## 8. Optional: DashScope Sidecar And Image Tools
+## 9. Optional: DashScope Sidecar And Image Tools
 
 The fork registers two extra tools, each with its own **exposure** (`/alibaba → Tools — Exposure`):
 
@@ -320,7 +391,7 @@ generation path is `/alibaba image <prompt>`.
 
 ---
 
-## 9. Configure Web Search with Exa
+## 10. Configure Web Search with Exa
 
 Add the Exa API key to your shell configuration:
 
@@ -349,7 +420,7 @@ Exa-powered web search.
 
 ---
 
-## 10. Install the Ask-User-Question Extension
+## 11. Install the Ask-User-Question Extension
 
 Install the `ask_user_question` tool extension:
 
@@ -363,7 +434,7 @@ of guessing. No configuration needed — restart the session after installing.
 
 ---
 
-## 11. Set Up OpenSpec for Spec-Driven Planning
+## 12. Set Up OpenSpec for Spec-Driven Planning
 
 Install OpenSpec globally (requires Node.js 20.19.0+; Pi bundles a compatible Node on PATH):
 
@@ -399,7 +470,7 @@ project from nothing with OpenSpec.
 
 ---
 
-## 12. Frontend Visual Loop: Browser Screenshots The Model Can See
+## 13. Frontend Visual Loop: Browser Screenshots The Model Can See
 
 Pi can only fix a layout it can see. This setup gives the model a real browser whose screenshots
 arrive as **image content inside the tool result**, so after editing a component it looks at the
@@ -451,7 +522,7 @@ against older CLIs. On this machine the first package call auto-upgraded 0.27.0 
 | `agent_browser` | main entry. `args` are 1:1 with the CLI (`open`, `screenshot`, `snapshot -i`, `set viewport`, `console`, `errors`, `eval`, `diff`, `vitals`, …). Use `batch` to fold a whole checkpoint into one call |
 | `agent_browser_code` | bounded JavaScript over the same browser for loops and branches. Limits: 25 calls, 120 s default, ≤8 images / 20 MiB total, 5 MiB per image |
 | `agent_browser_tools` | lists and enables the specialized tools (`agent_browser_action`, `_qa`, `_electron`, `_source`, `_network_source`). Inactive until enabled |
-| `agent_browser_web_search` | appears only when an Exa or Brave key resolves — already satisfied by [step 9](#9-configure-web-search-with-exa). Prefer it over automating Google, which serves CAPTCHAs to headless Chrome |
+| `agent_browser_web_search` | appears only when an Exa or Brave key resolves — already satisfied by [step 10](#10-configure-web-search-with-exa). Prefer it over automating Google, which serves CAPTCHAs to headless Chrome |
 
 ### The skill
 
@@ -492,7 +563,7 @@ script keeps its executable bit. It auto-triggers on UI edits and phrasing like
 
 ---
 
-## 13. Update / Uninstall The Alibaba Extension
+## 14. Update / Uninstall The Alibaba Extension
 
 `pi update` re-fetches the git source:
 
@@ -615,7 +686,7 @@ Personal skills load in every project. They are tracked under
 [`personal-skills/`](./personal-skills/README.md) and symlinked into `~/.pi/agent/skills/`:
 
 - **frontend-visual-loop** — browser screenshots the model can see during frontend work
-  ([step 12](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)). Copy it into
+  ([step 13](#13-frontend-visual-loop-browser-screenshots-the-model-can-see)). Copy it into
   `.pi/skills/` instead to scope it to one repo — not both, since a name collision keeps the
   first-discovered copy and warns on every start.
 
@@ -626,26 +697,28 @@ Personal skills load in every project. They are tracked under
 | Step | Command / Action | Purpose |
 |------|-----------------|---------|
 | 1 | `curl -fsSL https://pi.dev/install.sh \| sh` | Install Pi CLI (needs >= 1.0.0 for the fork) |
-| 2 | `pi install git:github.com/RarogCmex/pi-alibaba-models` | Add Alibaba model support (fork; no npm release) |
-| 3 | `pi remove npm:pi-alibaba-models` | Drop the stale npm copy so the guard doesn't block boot |
-| 4 | `pi` | Start Pi coding agent (new session, not `/reload`) |
-| 5 | `/alibaba` → **Cloud — Change Domain** → International / China / US / Hong Kong / workspace / Custom | Set the Cloud endpoint (optional) |
-| 6 | `/login` → **Use an API key → Alibaba Cloud (API Key)**, or **Plans → Alibaba Model Studio Coding Plan** | Authenticate |
-| 7 | `/scoped-models` → `qwen3.8-flash`, `qwen3.8-max`, `qwen3.7-plus` | Configure scoped models |
-| 8 | `/alibaba` → **Tools — Exposure** / **Cloud — Change API Format** | Opt into sidecar tools, image tools, Responses format |
-| 9 | Add `EXA_API_KEY` to `~/.bashrc` + `pi install npm:pi-web-access` | Configure web search with Exa |
-| 10 | `pi install npm:@juicesharp/rpiv-ask-user-question` | Install ask-user-question tool |
-| 11 | `npm install -g @fission-ai/openspec@latest` → `openspec init --tools pi --no-animation` → edit `openspec/config.yaml` `context:` block | Add spec-driven planning (`/opsx-propose` → `/opsx-apply` → `/opsx-archive`) |
-| 12 | `npm install -g agent-browser` + `agent-browser install --with-deps` + `pi install npm:pi-agent-browser-native` + symlink `personal-skills/frontend-visual-loop` into `~/.pi/agent/skills/` | Let the model see rendered UI while fixing frontends |
-| 13 | `pi update git:github.com/RarogCmex/pi-alibaba-models` | Keep the fork current |
+| 2 | Add `export PATH="$HOME/.local/share/pi-node/current/bin:$PATH"` to `~/.bashrc` | Make Pi's bundled Node the default node/npm (see step 2) |
+| 3 | `pi install git:github.com/RarogCmex/pi-alibaba-models` | Add Alibaba model support (fork; no npm release) |
+| 4 | `pi remove npm:pi-alibaba-models` | Drop the stale npm copy so the guard doesn't block boot |
+| 5 | `pi` | Start Pi coding agent (new session, not `/reload`) |
+| 6 | `/alibaba` → **Cloud — Change Domain** → International / China / US / Hong Kong / workspace / Custom | Set the Cloud endpoint (optional) |
+| 7 | `/login` → **Use an API key → Alibaba Cloud (API Key)**, or **Plans → Alibaba Model Studio Coding Plan** | Authenticate |
+| 8 | `/scoped-models` → `qwen3.8-flash`, `qwen3.8-max`, `qwen3.7-plus` | Configure scoped models |
+| 9 | `/alibaba` → **Tools — Exposure** / **Cloud — Change API Format** | Opt into sidecar tools, image tools, Responses format |
+| 10 | Add `EXA_API_KEY` to `~/.bashrc` + `pi install npm:pi-web-access` | Configure web search with Exa |
+| 11 | `pi install npm:@juicesharp/rpiv-ask-user-question` | Install ask-user-question tool |
+| 12 | `npm install -g @fission-ai/openspec@latest` → `openspec init --tools pi --no-animation` → edit `openspec/config.yaml` `context:` block | Add spec-driven planning (`/opsx-propose` → `/opsx-apply` → `/opsx-archive`) |
+| 13 | `npm install -g agent-browser` + `agent-browser install --with-deps` + `pi install npm:pi-agent-browser-native` + symlink `personal-skills/frontend-visual-loop` into `~/.pi/agent/skills/` | Let the model see rendered UI while fixing frontends |
+| 14 | `pi update git:github.com/RarogCmex/pi-alibaba-models` | Keep the fork current |
 
 ---
 
-*Last updated: 2026-10-04 — added [step 12](#12-frontend-visual-loop-browser-screenshots-the-model-can-see)
+*Last updated: 2026-10-04 — added [step 13](#13-frontend-visual-loop-browser-screenshots-the-model-can-see)
 (frontend visual loop: `agent-browser` + `pi-agent-browser-native` + `frontend-visual-loop` skill, now
 tracked under `personal-skills/`), the untracked-but-verified
-[Git Push Auth Under WSL](#git-push-auth-under-wsl) section, and renumbered the Alibaba
-update/uninstall section to 13. Its claims were checked against the installed
+[Git Push Auth Under WSL](#git-push-auth-under-wsl) section, and the new
+[Node.js And npm Under WSL](#2-nodejs-and-npm-under-wsl) step 2 (which renumbered the Alibaba
+update/uninstall section to 14). Its claims were checked against the installed
 wrapper source (0.7.1: `MINIMUM_AGENT_BROWSER_VERSION` 0.35.0, target 0.38.1, inline attachment in
 `lib/results/presentation/artifacts.js`, tool list and `agent_browser_code` limits from its README) and
 against live `pi -p` runs on `qwen3.8-flash` under WSL2/Ubuntu 24.04, including an end-to-end test where
