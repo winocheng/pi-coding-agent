@@ -37,3 +37,39 @@ context: |
 #     archive:
 #       guidance:
 #         - Summarize the archive outcome before finishing
+
+# --- greenfield mode: umbrella-roadmap bookkeeping -------------------------------
+# Added 2026-10-05 after adopting OpenSpec on a from-nothing project. See
+# GREENFIELD_GUIDE.md -> "Archive bookkeeping the CLI will not do for you".
+# This key is read by `openspec instructions <apply|archive> --json` and injected
+# into the bundled workflow as `operationGuidance`, so it needs no edits to the
+# generated files under .pi/ and it survives `openspec update`.
+# Every entry uses a folded scalar (>-): a bare "- text: more" parses as a mapping,
+# which makes the CLI drop the whole operation's guidance with a stderr warning.
+operations:
+  archive:
+    guidance:
+      - >-
+        If the change being archived is a child of an umbrella roadmap change, tick that
+        child's line in the umbrella's tasks.md. Tick it at archive time, not at
+        implementation time. No CLI step does this: the archive move touches nothing
+        outside changeRoot.
+      - >-
+        Commit the bookkeeping edits in the same commit as the archive move, then state in
+        the summary that they were committed. If they could not be done, say so rather
+        implying the roadmap is current.
+      - >-
+        Refresh every count or status claim that the archive makes stale (README, guides,
+        estimation notes). Find them by searching for their wording rather than recalling
+        it, and take the replacement numbers from `openspec list --json`,
+        `ls openspec/specs/`, and `ls openspec/changes/archive/` rather than from memory.
+  apply:
+    guidance:
+      - >-
+        Document a command only after actually running it. Never report a passing test,
+        lint, or CI run that was not observed: this repository has no test suite, lint
+        config, or CI, so verify work by observed behaviour instead.
+      - >-
+        When a task implements one slice of an umbrella roadmap, keep the change scoped to
+        that slice; anything learned that changes the roadmap belongs in an
+        `/opsx-update` of the umbrella, not in silent scope drift.
