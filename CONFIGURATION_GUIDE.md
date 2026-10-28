@@ -676,11 +676,19 @@ came from GCM rather than from a prompt you did not notice. Drop the variable on
 
 ## Project-Local And Personal Skills
 
-This repository also ships two skills under `.pi/skills/`, loaded automatically when working in this
-project (no install step):
+This repository also ships three hand-written skills under `.pi/skills/`. Pi loads them automatically
+when you work in this project, so there is no install step. (OpenSpec writes six generated skills into
+the same directory — see [step 12](#12-set-up-openspec-for-spec-driven-planning).)
 
+- **asd-ste100** — writing and rewriting human-facing docs in clear, simple English: a README,
+  changelog, setup guide, tutorial, release note, or user guide. It keeps numbers, commands, paths,
+  and links unchanged. The rules are ASD-STE100-inspired; the skill claims no certified compliance
+  and ships no approved-word dictionary
 - **pi-extension-authoring** — designing, writing, and debugging Pi extensions
 - **pi-skill-authoring** — authoring and reviewing Agent Skills (SKILL.md files)
+
+Pi loads a skill when the task matches its description. Force one with `/skill:asd-ste100`. Run
+`/reload` after you edit a skill during an active session.
 
 Personal skills load in every project. They are tracked under
 [`personal-skills/`](./personal-skills/README.md) and symlinked into `~/.pi/agent/skills/`:
@@ -713,7 +721,12 @@ Personal skills load in every project. They are tracked under
 
 ---
 
-*Last updated: 2026-10-04 — added [step 13](#13-frontend-visual-loop-browser-screenshots-the-model-can-see)
+*Last updated: 2026-10-28 — listed the `asd-ste100` skill in
+[Project-Local And Personal Skills](#project-local-and-personal-skills), which took the hand-written
+count from two to three. The description was read from `.pi/skills/asd-ste100/SKILL.md` on this
+machine, and the skill was confirmed present in Pi's startup skill list for this project.*
+
+*Earlier (2026-10-04) — added [step 13](#13-frontend-visual-loop-browser-screenshots-the-model-can-see)
 (frontend visual loop: `agent-browser` + `pi-agent-browser-native` + `frontend-visual-loop` skill, now
 tracked under `personal-skills/`), the untracked-but-verified
 [Git Push Auth Under WSL](#git-push-auth-under-wsl) section, and the new
