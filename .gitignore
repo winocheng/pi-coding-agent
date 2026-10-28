@@ -1,0 +1,53 @@
+# Local configuration and secrets — never commit.
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+.netrc
+credentials
+auth.json
+settings.json
+
+# Browser and QA artifacts from the frontend visual loop.
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.svg
+*.har
+*.webm
+*.trace
+.ui-checks/
+
+# OS and editor noise.
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Python cache from the skill check scripts.
+__pycache__/
+*.py[cod]
+
+# Node noise (this repo has no build, but scripts may pull deps locally).
+node_modules/
+
+# --- OpenSpec generated files -----------------------------------------------
+# `openspec init --tools pi` and `openspec update` write these. They are
+# disposable: a fresh init recreates them, and `openspec update` reverts any
+# hand edit. Run the init command to bring them back.
+.pi/prompts/opsx-*.md
+.pi/skills/openspec-*/
+
+# OpenSpec working directories. The CLI recreates the scaffold.
+openspec/changes/
+openspec/specs/
+
+# NOTE: openspec/config.yaml is NOT ignored. You edit it by hand. It holds the
+# `context:` block and the `operations.{archive,apply}.guidance` block, and
+# `openspec update` leaves it byte-identical. Keep it under version control.
+# To ignore it too, add `openspec/config.yaml` above and run:
+#   git rm --cached openspec/config.yaml
