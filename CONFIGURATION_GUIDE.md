@@ -1,12 +1,13 @@
 # Pi Coding Agent — Configuration Guide
 
-This document walks through the full setup process for configuring the Pi coding agent with Alibaba Cloud models.
+This guide sets up the Pi coding agent with Alibaba Cloud models.
 
 > **Extension source changed (2026-10-04).** This guide previously installed the Alibaba provider with
-> `pi install npm:pi-alibaba-models`. That npm package is the **original upstream** release and has no
-> fork equivalent published — the maintained fork we now document,
-> [`RarogCmex/pi-alibaba-models`](https://github.com/RarogCmex/pi-alibaba-models), is installed from git.
-> If Pi is already configured with the npm package, do [step 4](#4-migrate-off-the-npm-package) first.
+> `pi install npm:pi-alibaba-models`. That npm package is the **original upstream** release. It has no
+> fork equivalent on npm. The guide now documents the maintained fork,
+> [`RarogCmex/pi-alibaba-models`](https://github.com/RarogCmex/pi-alibaba-models), which installs from
+> git. If Pi is already configured with the npm package, do [step 4](#4-migrate-off-the-npm-package)
+> first.
 
 ---
 
@@ -36,7 +37,7 @@ This document walks through the full setup process for configuring the Pi coding
 
 ## 1. Install Pi
 
-Download and run the official installer script:
+Run the official installer script:
 
 ```bash
 curl -fsSL https://pi.dev/install.sh | sh
@@ -44,19 +45,21 @@ curl -fsSL https://pi.dev/install.sh | sh
 
 This installs the Pi coding agent CLI to your system.
 
-> **Version floor.** The Alibaba fork requires Pi **1.0.0 or newer** and refuses to start with a clear
-> diagnostic on older hosts (`pi --version` to check). The last fork release that runs on pre-1.0.0
-> hosts is 1.5.3.
+> **Version floor.** The Alibaba fork requires Pi **1.0.0 or newer**. On an older host it refuses to
+> start and prints a clear diagnostic. Run `pi --version` to check your host. The last fork release
+> that runs on pre-1.0.0 hosts is 1.5.3.
 
 ---
 
 ## 2. Node.js And npm Under WSL
 
-Pi bundles its own Node.js and puts it first on `PATH`, so inside a Pi session `node`, `npm`, and `npx`
-all resolve to Pi's copy. A plain terminal does **not** inherit that: on a fresh shell `node` falls back
-to the old apt build (v18, which ships no `npm` at all), and `npm` may resolve to a Windows-side copy
-over interop. That mismatch is the root of most "why did this install land somewhere weird" confusion,
-so make Pi's Node the default everywhere.
+Pi bundles its own Node.js and puts it first on `PATH`. Inside a Pi session `node`, `npm`, and `npx`
+all resolve to Pi's copy.
+
+A plain terminal does **not** inherit that. On a fresh shell `node` falls back to the old apt build
+(v18), which ships no `npm` at all. `npm` may resolve to a Windows-side copy over interop. That
+mismatch causes most "why did this install land somewhere weird" confusion. Make Pi's Node the default
+everywhere.
 
 ### What is actually installed here
 
@@ -68,8 +71,8 @@ so make Pi's Node the default everywhere.
 
 ### Make Pi's Node the default
 
-Pi's launcher prepends `~/.local/share/pi-node/current/bin` to `PATH` only for the `pi` process. Add the
-same line to your shell profile so every terminal agrees:
+Pi's launcher prepends `~/.local/share/pi-node/current/bin` to `PATH`. It does that only for the `pi`
+process. Add the same line to your shell profile, so every terminal agrees:
 
 ```bash
 cat << 'EOF' >> ~/.bashrc
@@ -89,34 +92,36 @@ which -a node           # pi-node first, then /usr/bin/node
 npm config get prefix   # ~/.local/share/pi-node/...
 ```
 
-Now `npm install -g <tool>` (agent-browser, openspec, …) lands in Pi's Node tree and on `PATH`, and
-`pi install npm:…` resolves packages against the same Node — so what you install is what Pi runs.
+Now `npm install -g <tool>` (agent-browser, openspec, …) lands in Pi's Node tree and on `PATH`.
+`pi install npm:…` resolves packages against the same Node. What you install is what Pi runs.
 
-> **Interactive shells only.** `.bashrc` is read by interactive terminals; non-interactive shells
-> (scripts, cron, `bash -c`) skip it via the standard `case $-` guard near the top of the file. Pi's
-> own installs are unaffected — the launcher prepends Pi's Node inside the `pi` process — but if a
-> script invokes `npm` directly, add the same `export` to `~/.profile` as well.
+> **Interactive shells only.** Interactive terminals read `.bashrc`. Non-interactive shells (scripts,
+> cron, `bash -c`) skip it, because of the standard `case $-` guard near the top of the file. Pi's own
+> installs are unaffected: the launcher prepends Pi's Node inside the `pi` process. If a script calls
+> `npm` directly, add the same `export` to `~/.profile` too.
 
-> **Why not nvm?** Microsoft's WSL guidance recommends a version manager, and nvm is the right tool if
-> you do general Node development across many versions. But Pi already ships and pins its own Node, and
-> Pi always runs on that copy regardless of nvm. For a Pi-centric setup, letting Pi's Node be the
-> default is simpler and avoids two managers fighting over `PATH`. Install nvm only for non-Pi projects
-> that need a different version — and keep Pi's Node ahead of it on `PATH`.
+> **Why not nvm?** Microsoft's WSL guidance recommends a version manager. nvm is the right tool if you
+> do general Node development across many versions. But Pi already ships its own Node and pins it, and
+> Pi always runs on that copy regardless of nvm.
+>
+> For a Pi-centric setup, letting Pi's Node be the default is simpler. It avoids two managers fighting
+> over `PATH`. Install nvm only for non-Pi projects that need a different version. Keep Pi's Node ahead
+> of it on `PATH`.
 
-> **The version floor matters.** Pi requires Node `>=22.19.0`, and its package manager resolves packages
-> against that Node. A package that declares a newer engine (for example one needing Node 24) is
-> deliberately installed at the newest version that runs under Pi's Node — that is correct behaviour,
-> not a bug. Upgrading Node on your own will not make Pi use it; Pi runs on its bundled copy.
+> **The version floor matters.** Pi requires Node `>=22.19.0`. Its package manager resolves packages
+> against that Node. Pi deliberately installs a package that declares a newer engine (for example one
+> needing Node 24) at the newest version that runs under Pi's Node. That is correct behaviour, not a
+> bug. Upgrading Node on your own will not make Pi use it. Pi runs on its bundled copy.
 
 ### Clean up the strays (optional)
 
 - **apt Node** is outdated and ships no npm. Once Pi's Node is first on `PATH` it is harmless but
-  confusing; remove it with `sudo apt remove nodejs` if nothing else depends on it
-  (`apt-cache rdepends --installed nodejs`).
-- **Windows Node** (`/mnt/c/nvm4w`, `/mnt/c/Program Files/nodejs`) leaks into WSL `PATH` because
-  `appendWindowsPath` defaults to true. Leave it for Windows-side tools; Pi's Node wins on `PATH` order
-  so it will not interfere. Setting `appendWindowsPath=false` in `/etc/wsl.conf` removes the clutter but
-  also hides other Windows executables — only do that deliberately.
+  confusing. Remove it with `sudo apt remove nodejs` if nothing else depends on it. Check first with
+  `apt-cache rdepends --installed nodejs`.
+- **Windows Node** (`/mnt/c/nvm4w`, `/mnt/c/Program Files/nodejs`) leaks into WSL `PATH`, because
+  `appendWindowsPath` defaults to true. Leave it for Windows-side tools. Pi's Node wins on `PATH`
+  order, so it will not interfere. Set `appendWindowsPath=false` in `/etc/wsl.conf` to remove the
+  clutter, but only do that deliberately: it also hides other Windows executables.
 
 ---
 
@@ -128,7 +133,7 @@ Install the Alibaba provider from the maintained fork:
 pi install git:github.com/RarogCmex/pi-alibaba-models
 ```
 
-Or from a local checkout (useful for pinning a commit or hacking on it):
+Or install from a local checkout. Use this to pin a commit or to hack on the fork:
 
 ```bash
 git clone https://github.com/RarogCmex/pi-alibaba-models
@@ -138,9 +143,11 @@ cd pi-alibaba-models && pi install .
 > **The fork is never published to npm.** `pi install npm:pi-alibaba-models` and
 > `pi install pi-alibaba-models` both resolve the **original upstream** package, not this fork.
 
-Restart Pi in a **new session** after installing (more reliable than `/reload` for provider
-registration). On boot the extension registers two providers — `alibaba-plan` and `alibaba-cloud` —
-the `/alibaba` command, the DashScope sidecar tool (`alibaba_tools`), and image models/tools.
+Restart Pi in a **new session** after you install the fork. This is more reliable than `/reload` for
+provider registration.
+
+On boot, the extension registers two providers (`alibaba-plan` and `alibaba-cloud`), the `/alibaba`
+command, the DashScope sidecar tool (`alibaba_tools`), and image models and tools.
 
 Verify:
 
@@ -165,9 +172,11 @@ pi --offline --list-models alibaba-cloud    # real model ids from the cached cat
 
 ## 4. Migrate Off The npm Package
 
-Do this once if `pi list` shows `npm:pi-alibaba-models` (i.e. following step 3 above installed the git
-fork while the npm copy is still configured). Two copies register the same `alibaba-cloud` provider, and
-the fork's guard makes Pi fail at startup with:
+Do this once if `pi list` shows `npm:pi-alibaba-models`. That happens when step 3 installed the git
+fork while the npm copy is still configured.
+
+Two copies register the same `alibaba-cloud` provider. The fork's guard then makes Pi fail at startup
+with:
 
 ```
 pi-alibaba-models is installed 2 times; 1 of those would shadow this copy in the same pi process.
@@ -180,9 +189,10 @@ pi remove npm:pi-alibaba-models
 rm -rf ~/.pi/agent/npm/node_modules/pi-alibaba-models   # only if it lingers in `pi list`
 ```
 
-`pi remove` edits `~/.pi/agent/settings.json` (`packages`) but leaves extension-private state behind,
-which is what you want here — the existing key and domain config carry over to the fork. To start from a
-clean slate instead, wipe the fork's state too (you will need to `/login` again):
+`pi remove` edits `~/.pi/agent/settings.json` (`packages`). It leaves extension-private state behind,
+which is what you want here: the existing key and domain config carry over to the fork.
+
+To start from a clean slate, wipe the fork's state too. You will need to `/login` again:
 
 ```bash
 rm -f ~/.pi/agent/alibaba-config.json ~/.pi/agent/alibaba-models.cache.json \
@@ -193,8 +203,8 @@ rm -f ~/.pi/agent/alibaba-config.json ~/.pi/agent/alibaba-models.cache.json \
 # and drop any "alibaba-*/…" ids from enabledModels in ~/.pi/agent/settings.json
 ```
 
-> Or, from inside a session, `/alibaba → Reset all` wipes config, both auth entries, the plan-model
-> cache and `alibaba-*` entries in `enabledModels` in one step.
+> Or run `/alibaba → Reset all` inside a session. It wipes the config, both auth entries, the
+> plan-model cache, and `alibaba-*` entries in `enabledModels` in one step.
 
 Finally confirm only one copy is configured:
 
@@ -206,13 +216,13 @@ pi list
 
 ## 5. Start Pi
 
-Launch Pi by running:
+Start Pi:
 
 ```bash
 pi
 ```
 
-This starts the interactive coding agent session.
+This opens an interactive coding agent session.
 
 ---
 
@@ -239,54 +249,62 @@ and a free-text Custom entry:
 | Custom | *(paste your own)* |
 
 Workspace regions are `cn-beijing`, `ap-southeast-1`, `ap-northeast-1`, `eu-central-1`, `us-east-1`.
-Alibaba recommends workspace domains, and they are **required** for Tokyo and Frankfurt (those regions
-have no shared host).
+Alibaba recommends workspace domains. Tokyo and Frankfurt **require** one, because those regions have no
+shared host.
 
-> **Hong Kong workspace hosts.** `cn-hongkong` is *not* one of the fork's workspace regions, so a
-> `{WorkspaceId}.cn-hongkong.maas.aliyuncs.com` endpoint has to be entered through **Custom** — the menu
-> will not build it for you, and the workspace auto-upgrade below never touches it (nor any Custom host).
+> **Hong Kong workspace hosts.** `cn-hongkong` is *not* one of the fork's workspace regions. So a
+> `{WorkspaceId}.cn-hongkong.maas.aliyuncs.com` endpoint must go through **Custom**: the menu will not
+> build it for you. The workspace auto-upgrade below never touches it, and never touches any Custom
+> host.
 > This is exactly the case for an existing `…​.cn-hongkong.maas.aliyuncs.com` config: it survives the
 > migration untouched and is read as a custom, key-independent domain.
 
 ### Auto workspace-domain upgrade
 
-When the Cloud domain is one of the three shared regional hosts, the extension reads the WorkspaceId
-bound to your key from `GET /api/v1/models/limits`, probes `{WorkspaceId}.{region}.maas.aliyuncs.com`,
-and **only on a successful probe** switches the config to the workspace host. A failed probe changes
-nothing and retries at most once per 24 h. Manage it with **Cloud — Auto workspace domain**
-(detect now / enable / disable); picking a shared host explicitly in the menu counts as "stay here" and
-disables it. `/alibaba → Status` shows `Auto-WS` and the discovered WorkspaceId.
+When the Cloud domain is one of the three shared regional hosts, the extension does this:
+
+1. Read the WorkspaceId bound to your key from `GET /api/v1/models/limits`.
+2. Probe `{WorkspaceId}.{region}.maas.aliyuncs.com`.
+3. Switch the config to the workspace host. This happens **only on a successful probe**.
+
+A failed probe changes nothing. It retries at most once per 24 h. Manage the behaviour with
+**Cloud — Auto workspace domain** (detect now / enable / disable). If you pick a shared host explicitly
+in the menu, that counts as "stay here" and disables it. `/alibaba → Status` shows `Auto-WS` and the
+discovered WorkspaceId.
 
 ### API format
 
 The fork defaults Cloud to **OpenAI Responses** (`/compatible-mode/v1/responses`). The format is pinned
-into `alibaba-config.json` on first boot, so an existing `"cloudApiFormat": "anthropic-messages"` entry
-(stale npm-era value) is **kept** rather than silently flipped. To move onto Responses:
+into `alibaba-config.json` on first boot. So an existing `"cloudApiFormat": "anthropic-messages"` entry
+(a stale npm-era value) is **kept**, not silently flipped. To move onto Responses:
 
 ```
 /alibaba → Cloud — Change API Format → OpenAI Responses
 ```
 
-Per-model fallbacks stay automatic: a family whose capability row is not Responses-capable is routed to
-Chat Completions on its own (`kimi-k2.x`, `MiniMax-M2.5`, `glm-4.5`, bare `glm-5`/`glm-5.1`, and older
-DeepSeek/GLM/Kimi/MiniMax releases). 2.0.0 raised DeepSeek V4/V4.1, GLM-5.2/5.3, MiniMax-M2.1 and
-Kimi K3 onto Responses, so the set is much smaller than the 1.5.x release notes suggest — measured
-against this workspace's 26-id catalogue, **only `kimi-k2.7-code` falls back**. `/alibaba → Status`
-reports how many models fall back. With Responses active, requests carry
-`x-dashscope-session-cache: enable` — toggle it with **Cloud — Session Cache: On / Off** if your usage
-is one-shot-heavy (cache writes bill at 125 % of input, reads come back at ~10 %).
+Per-model fallbacks stay automatic. The extension routes a family whose capability row is not
+Responses-capable to Chat Completions on its own: `kimi-k2.x`, `MiniMax-M2.5`, `glm-4.5`, bare
+`glm-5`/`glm-5.1`, and older DeepSeek/GLM/Kimi/MiniMax releases.
+
+2.0.0 raised DeepSeek V4/V4.1, GLM-5.2/5.3, MiniMax-M2.1 and Kimi K3 onto Responses, so the set is much
+smaller than the 1.5.x release notes suggest. Measured against this workspace's 26-id catalogue, **only
+`kimi-k2.7-code` falls back**. `/alibaba → Status` reports how many models fall back.
+
+With Responses active, requests carry `x-dashscope-session-cache: enable`. If your usage is
+one-shot-heavy, toggle it with **Cloud — Session Cache: On / Off**. Cache writes bill at 125 % of input;
+reads come back at ~10 %.
 
 > **Measured on this setup (2026-10-04, `openai-responses`, Hong Kong workspace domain, thinking
 > `high`, `qwen3.8-flash`):** a forced ~2,000-word answer completed with `stopReason: stop` at **5,920
-> output tokens** (10,246 characters of thinking, nothing truncated), and a third turn in the same
+> output tokens**, with 10,246 characters of thinking and nothing truncated. A third turn in the same
 > session read `cacheRead: 11,436` of a 11,718-token prompt (~97 %). The first follow-up turn can still
-> show `cacheRead: 0` while the server-side session cache warms up, so judge the cache over three turns
-> rather than two.
+> show `cacheRead: 0` while the server-side session cache warms up. Judge the cache over three turns,
+> not two.
 >
 > **The truncation fix does not depend on this format switch.** The fork's real catalogue
-> `max_output_tokens` (131,072) leaves enough answer room even on `anthropic-messages` — measured there
-> too: 4,858 output tokens, `stopReason: stop`. Responses is preferred because thinking and the answer
-> do not share one `max_tokens` budget at all, and because session-cache reads are cheaper than the
+> `max_output_tokens` (131,072) leaves enough answer room even on `anthropic-messages`; measured there
+> too: 4,858 output tokens, `stopReason: stop`. Responses is preferred for two reasons. Thinking and the
+> answer do not share one `max_tokens` budget at all, and session-cache reads are cheaper than the
 > implicit Anthropic-path cache.
 
 Other entries in the same menu: `Status`, `Refresh model lists`, `Re-login Plan` / `Re-login Cloud`,
@@ -301,25 +319,26 @@ Other entries in the same menu: `Status`, `Refresh model lists`, `Re-login Plan`
 /login
 ```
 
-Pick the entry matching your account type — there is **no "Alibaba Hong Kong" provider**; the region is
-a Cloud *domain* setting (step 6), not a provider:
+Pick the entry that matches your account type. There is **no "Alibaba Hong Kong" provider**. The region
+is a Cloud *domain* setting (step 6), not a provider:
 
 | Account | `/login` section | Provider entry | Provider id | Token shape |
 |---|---|---|---|---|
 | Pay-per-token DashScope | **Use an API key** | Alibaba Cloud (API Key) | `alibaba-cloud` | `sk-…` |
 | Model Studio Coding Plan subscription | **Plans** | Alibaba Model Studio Coding Plan | `alibaba-plan` | `sk-sp-…` / `sk-tok-…` |
 
-Both providers register side by side, so you can switch per chat from the model picker.
+Both providers register side by side. You can switch per chat from the model picker.
 
-> **Cloud without `/login`:** the Cloud provider also reads the `DASHSCOPE_API_KEY` environment
-> variable. If it is set, the live catalogue is fetched from it on startup and no login step is needed.
+> **Cloud without `/login`:** The Cloud provider also reads the `DASHSCOPE_API_KEY` environment
+> variable. If it is set, the extension fetches the live catalogue from it on startup. No login step is
+> needed.
 
 > **Pasted the wrong token shape?** The login validators catch it and offer to redirect you. To redo a
 > provider manually: `/alibaba → Re-login Cloud` (or `Re-login Plan`), then `/login` again.
 
-Replacing the Cloud key **re-derives the endpoint from scratch** (shared default first, then the new
-key's own workspace domain), so a stale workspace host can no longer `403` a fresh key. Use
-`Re-login Cloud` to clear the key binding and force that re-derivation immediately.
+Replacing the Cloud key **re-derives the endpoint from scratch**: the shared default first, then the new
+key's own workspace domain. So a stale workspace host can no longer `403` a fresh key. Use
+`Re-login Cloud` to clear the key binding. It forces that re-derivation immediately.
 
 ---
 
@@ -331,8 +350,8 @@ Enable the Alibaba models used for model cycling:
 /scoped-models
 ```
 
-The fork serves a **live catalogue**, so model ids come from Alibaba rather than from a list baked into
-the package. Confirm real ids before editing settings by hand:
+The fork serves a **live catalogue**. Model ids come from Alibaba, not from a list baked into the
+package. Confirm the real ids before you edit settings by hand:
 
 ```bash
 pi --offline --list-models alibaba-cloud     # cached snapshot, zero network
@@ -346,10 +365,12 @@ The three enabled models for this setup (stored as `enabledModels` in `~/.pi/age
 | Qwen 3.8 Max | `alibaba-cloud/qwen3.8-max` |
 | Qwen 3.7 Plus | `alibaba-cloud/qwen3.7-plus` |
 
-These are what `Ctrl+P` cycles through. The provider id prefix (`alibaba-cloud/`) is unchanged from the
-npm package, so existing `enabledModels` entries carry over — but a stale id left in `enabledModels` can
-now be pruned automatically by `/alibaba → Reset all`, and new catalogue ids (`qwen3.6-*`, DeepSeek V4,
-Kimi K2.6, GLM-5, MiniMax M2.5, …) are available without any extension update.
+`Ctrl+P` cycles through these three. The provider id prefix (`alibaba-cloud/`) is unchanged from the npm
+package, so existing `enabledModels` entries carry over. Two things are new:
+
+- `/alibaba → Reset all` can now prune a stale id left in `enabledModels`.
+- New catalogue ids (`qwen3.6-*`, DeepSeek V4, Kimi K2.6, GLM-5, MiniMax M2.5, …) are available without
+  any extension update.
 
 If a newly shipped model does not appear:
 
@@ -375,15 +396,15 @@ The fork registers two extra tools, each with its own **exposure** (`/alibaba �
 | `alibaba_tools` | one tool for live web search, page extract, code interpreter, image search. Cloud key required; billed separately. |
 | `alibaba_image` | DashScope image generation/editing with every generation parameter (`model`, `size`, `n`, `seed`, `negative_prompt`, `prompt_extend`, `save`, …). Cloud only — Plan accounts register no image models. |
 
-Because the 2.0.0 default changed from `direct` to `codemode`, a setup that wants the model to call the
-sidecar directly must set it explicitly:
+The 2.0.0 default changed from `direct` to `codemode`. If you want the model to call the sidecar
+directly, set the exposure explicitly:
 
 ```
 /alibaba → Tools — Exposure → alibaba_tools → direct
 ```
 
-With both tools left at `codemode` and `codemode` disabled in Pi, neither is reachable and the only
-generation path is `/alibaba image <prompt>`.
+If both tools stay at `codemode` and you disable `codemode` in Pi, neither tool is reachable. The only
+generation path is then `/alibaba image <prompt>`.
 
 ```text
 /alibaba image a red fox in the snow --model qwen-image-max --size 1664*928 --save fox.png
@@ -408,14 +429,14 @@ Then install the web access extension:
 pi install npm:pi-web-access
 ```
 
-Restart Pi for the extension to load its tools. The `EXA_API_KEY` environment variable will enable
+Restart Pi so the extension loads its tools. The `EXA_API_KEY` environment variable then enables
 Exa-powered web search.
 
-> **Note:** `/reload` may not be sufficient — start a new session for the extension tools to register
+> **Note:** `/reload` may not be sufficient. Start a new session so the extension tools register
 > properly.
 >
-> **Overlap:** the Alibaba fork ships its own web search (`alibaba_tools`), billed on the DashScope
-> sidecar. Keep Exa if you want provider-independent search; drop `pi-web-access` if you would rather
+> **Overlap:** The Alibaba fork ships its own web search (`alibaba_tools`), billed on the DashScope
+> sidecar. Keep Exa if you want provider-independent search. Drop `pi-web-access` if you would rather
 > pay for one search path only.
 
 ---
@@ -429,14 +450,16 @@ pi install npm:@juicesharp/rpiv-ask-user-question
 ```
 
 This gives the model a structured way to ask clarifying questions during a task: a terminal dialog with
-up to four questions and selectable options. The model calls it when instructions are ambiguous instead
-of guessing. No configuration needed — restart the session after installing.
+up to four questions and selectable options. The model calls it when your instructions are ambiguous,
+instead of guessing.
+
+No configuration is needed. Restart the session after you install it.
 
 ---
 
 ## 12. Set Up OpenSpec for Spec-Driven Planning
 
-Install OpenSpec globally (requires Node.js 20.19.0+; Pi bundles a compatible Node on PATH):
+Install OpenSpec globally. It requires Node.js 20.19.0+; Pi bundles a compatible Node on PATH:
 
 ```bash
 npm install -g @fission-ai/openspec@latest
@@ -451,8 +474,11 @@ openspec init --tools pi --no-animation
 This writes six Pi slash commands under `.pi/prompts/opsx-*.md` and six matching skills under
 `.pi/skills/openspec-*/SKILL.md` — `explore`, `propose`, `apply`, `update`, `sync`, `archive`.
 
-Then edit the generated `openspec/config.yaml` and replace the commented-out `context:` placeholder with
-a short project description so proposals fit this docs-only repo.
+This repo gitignores those files. Treat them as disposable: a fresh `openspec init` recreates them, and
+`openspec update` reverts any hand edit.
+
+Then edit the generated `openspec/config.yaml`. Replace the commented-out `context:` placeholder with a
+short project description. Proposals then fit this docs-only repo.
 
 ```yaml
 schema: spec-driven
@@ -465,20 +491,22 @@ context: |
   Markdown guides. Never assume a package manager or CI exists here.
 ```
 
-See [`GREENFIELD_GUIDE.md`](./GREENFIELD_GUIDE.md) for the umbrella-change workflow used to start a
-project from nothing with OpenSpec.
+For the umbrella-change workflow that starts a project from nothing with OpenSpec, see
+[`GREENFIELD_GUIDE.md`](./GREENFIELD_GUIDE.md).
 
 ---
 
 ## 13. Frontend Visual Loop: Browser Screenshots The Model Can See
 
-Pi can only fix a layout it can see. This setup gives the model a real browser whose screenshots
-arrive as **image content inside the tool result**, so after editing a component it looks at the
-rendered page instead of guessing from source. Pi's tool contract already allows it —
-`AgentToolResult.content` is `(TextContent | ImageContent)[]`, documented as "Text or image content
-returned to the model" — so this is a supported path, not a workaround.
+Pi can only fix a layout it can see. This setup gives the model a real browser. Its screenshots arrive
+as **image content inside the tool result**, so after an edit the model looks at the rendered page
+instead of guessing from source.
 
-Two pieces, one for capability and one for judgement:
+Pi's tool contract already allows this. `AgentToolResult.content` is `(TextContent | ImageContent)[]`,
+documented as "Text or image content returned to the model". So this is a supported path, not a
+workaround.
+
+Two pieces are involved. One adds the capability, the other the judgement:
 
 | Piece | Contributes |
 |---|---|
@@ -492,14 +520,14 @@ npm install -g agent-browser
 agent-browser install --with-deps
 ```
 
-> **Install inside WSL, not through Windows npm.** A `/mnt/c/...` install runs the CLI over interop
-> while Chrome for Testing runs natively, so relative paths resolve against the long-lived daemon's
-> launch directory and screenshots land in the wrong folder. Confirm with
-> `which -a agent-browser` — the `~/.local/share/pi-node/...` entry must come first.
+> **Install inside WSL, not through Windows npm.** A `/mnt/c/...` install runs the CLI over interop,
+> while Chrome for Testing runs natively. Relative paths then resolve against the long-lived daemon's
+> launch directory, so screenshots land in the wrong folder. Confirm with `which -a agent-browser`.
+> The `~/.local/share/pi-node/...` entry must come first.
 
-`agent-browser install --with-deps` downloads Chrome for Testing to `~/.agent-browser/browsers/` and
-installs the Linux system libraries it needs. It runs headless (`--headless=new` with SwiftShader),
-so no display server is involved.
+`agent-browser install --with-deps` downloads Chrome for Testing to `~/.agent-browser/browsers/`. It
+also installs the Linux system libraries Chrome needs. Chrome then runs headless (`--headless=new`
+with SwiftShader), so no display server is involved.
 
 ### Install the Pi package
 
@@ -508,12 +536,12 @@ pi install npm:pi-agent-browser-native
 pi list
 ```
 
-The wrapper enforces an upstream CLI floor of **0.35.0** (target **0.38.1**) and refuses to run
-against older CLIs. On this machine the first package call auto-upgraded 0.27.0 → 0.38.1.
+The wrapper enforces an upstream CLI floor of **0.35.0** (target **0.38.1**). It refuses to run
+against older CLIs. On this machine, the first package call auto-upgraded 0.27.0 → 0.38.1.
 
-> **Version note.** On Node 22 npm resolves **0.7.1**, not the latest 0.9.x, because 0.9 declares
-> `engines.node >=24.21.0`. 0.7.1 has the same inline-image attachment, so the visual loop works
-> unchanged; upgrade Node past 24.21 only if you want the newer wrapper.
+> **Version note.** On Node 22, npm resolves **0.7.1**, not the latest 0.9.x. That is because 0.9
+> declares `engines.node >=24.21.0`. 0.7.1 has the same inline-image attachment, so the visual loop
+> works unchanged. Upgrade Node past 24.21 only if you want the newer wrapper.
 
 ### Tools
 
@@ -526,18 +554,20 @@ against older CLIs. On this machine the first package call auto-upgraded 0.27.0 
 
 ### The skill
 
-Tracked in this repo at [`personal-skills/frontend-visual-loop/`](./personal-skills/README.md) and
-symlinked into the personal skills directory, so it stays personal-scope (following you into every
-frontend repo) while remaining version-controlled with the repo as the single source of truth:
+The repo tracks the skill at
+[`personal-skills/frontend-visual-loop/`](./personal-skills/README.md), and a symlink puts it in the
+personal skills directory. It stays personal-scope, so it follows you into every frontend repo, and the
+repo stays the single source of truth:
 
 ```bash
 ln -s "$PWD/personal-skills/frontend-visual-loop" ~/.pi/agent/skills/frontend-visual-loop
 ```
 
-Pi's loader follows symlinked skill directories, so no copy or sync step is needed and the bundled
-script keeps its executable bit. It auto-triggers on UI edits and phrasing like
-"looks wrong", "is invisible", "check the page", "responsive check", and can be forced with
-`/skill:frontend-visual-loop`. It encodes:
+Pi's loader follows symlinked skill directories, so no copy or sync step is needed. The bundled script
+keeps its executable bit.
+
+The skill triggers on UI edits and on phrasing like "looks wrong", "is invisible", "check the page",
+and "responsive check". Force it with `/skill:frontend-visual-loop`. It encodes:
 
 - screenshot **before** editing to confirm the symptom, and **after** to confirm the fix
 - a 390×844 / 768×1024 / 1280×800 viewport matrix — desktop-only checks miss the common defects
@@ -545,9 +575,9 @@ script keeps its executable bit. It auto-triggers on UI edits and phrasing like
 - absolute artifact paths, and closing the browser at the end
 - `scripts/viewport-sweep.sh` for a three-viewport capture in one command
 
-> **Screenshots are not free.** Images stay in the transcript and are re-sent on every later request,
-> so the skill captures at decision points rather than after each edit. There is deliberately no
-> auto-screenshot hook on `tool_call`; if you want one, pair it with a `context` handler that drops
+> **Screenshots are not free.** Images stay in the transcript and are re-sent on every later request.
+> So the skill captures at decision points, not after each edit. There is deliberately no
+> auto-screenshot hook on `tool_call`. If you want one, pair it with a `context` handler that drops
 > stale images first.
 
 ### Gotchas verified on this machine
@@ -571,8 +601,8 @@ script keeps its executable bit. It auto-triggers on UI edits and phrasing like
 pi update git:github.com/RarogCmex/pi-alibaba-models
 ```
 
-> **`pi remove` does not clean extension-private state** — auth entries, `alibaba-config.json`, catalog
-> caches and `alibaba-*` ids in `enabledModels` all survive it. For a clean uninstall:
+> **`pi remove` does not clean extension-private state.** Auth entries, `alibaba-config.json`, catalog
+> caches, and `alibaba-*` ids in `enabledModels` all survive it. For a clean uninstall:
 
 ```text
 1. /alibaba  →  "Reset all"   (wipes config, both auth entries, plan-models cache, alibaba-* enabledModels)
@@ -593,14 +623,14 @@ The fork's own state files (all under `~/.pi/agent`, or `$PI_CODING_AGENT_DIR`):
 
 ## Git Push Auth Under WSL
 
-WSL keeps its own git config and has no credentials of its own, so the first `git push` fails with:
+WSL keeps its own git config. It has no credentials of its own, so the first `git push` fails with:
 
 ```text
 fatal: could not read Username for 'https://github.com': No such device or address
 ```
 
-Rather than maintaining a second set of keys, let WSL borrow the credentials Git for Windows already
-stores. One login on either side then covers both.
+Do not maintain a second set of keys. Let WSL borrow the credentials Git for Windows already stores.
+One login on either side then covers both.
 
 ### Prerequisites (all on the Windows side)
 
@@ -614,11 +644,11 @@ must be true:
 | 3 | A GitHub account already signed in on Windows | `"/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe" github list` prints your login |
 | 4 | WSL interop enabled, so `.exe` files can run | `ls /proc/sys/fs/binfmt_misc/WSLInterop`, and no `[interop] enabled=false` in `/etc/wsl.conf` |
 
-> **Row 3 is the one people are missing.** If `github list` prints nothing, seed it **from Windows**:
-> run `git-credential-manager github login` in PowerShell, or simply `git push` once from Git Bash and
+> **Row 3 is the one people are missing.** If `github list` prints nothing, seed it **from Windows**.
+> Run `git-credential-manager github login` in PowerShell. Or run `git push` once from Git Bash and
 > finish the browser sign-in. GCM then stores the token in **Windows Credential Manager**, visible as
-> `git:https://github.com` under `cmdkey /list`, and that vault is what WSL reads afterwards. Nothing
-> needs to be signed into from inside WSL.
+> `git:https://github.com` under `cmdkey /list`. That vault is what WSL reads afterwards. Nothing needs
+> to be signed into from inside WSL.
 
 ### Configure WSL
 
@@ -627,9 +657,9 @@ git config --global credential.helper \
   '!"/mnt/c/Program Files/Git/mingw64/bin/git-credential-manager.exe"'
 ```
 
-> **The `!` prefix is not optional.** It tells git to run the value through a shell, which is what lets
-> the space in `Program Files` parse. A bare path is split on the first space and fails. Adjust the
-> path if Git lives elsewhere (Scoop, a custom install dir).
+> **The `!` prefix is not optional.** It tells git to run the value through a shell. That lets the
+> space in `Program Files` parse. A bare path is split on the first space and fails. If Git lives
+> elsewhere (Scoop, a custom install dir), adjust the path.
 
 ### Verify
 
@@ -637,8 +667,8 @@ git config --global credential.helper \
 GIT_TERMINAL_PROMPT=0 git ls-remote origin refs/heads/main
 ```
 
-`GIT_TERMINAL_PROMPT=0` forbids any interactive fallback, so a successful run proves the credential
-came from GCM rather than from a prompt you did not notice. Drop the variable once it works.
+`GIT_TERMINAL_PROMPT=0` forbids any interactive fallback. A successful run then proves the credential
+came from GCM, not from a prompt you did not notice. Drop the variable once it works.
 
 ### If it stops working
 
@@ -650,11 +680,11 @@ came from GCM rather than from a prompt you did not notice. Drop the variable on
 | `git-credential-manager.exe: command not found` or exec error | Interop disabled. Check `/etc/wsl.conf` for `[interop] enabled=false`, then `wsl --shutdown` from Windows |
 | Push works from Windows but not WSL, no error | Windows git and WSL git are separate installs with separate configs — this section configures only the WSL one |
 
-> **Scope note.** This lets WSL git read your Windows credential vault for every HTTPS git operation,
-> including the `git clone` that Pi itself shells out to for `pi install git:…` sources, so a private
-> git-hosted package installs without further setup. That convenience crosses the WSL/Windows boundary:
-> if you want the two environments isolated, skip this and use a dedicated SSH key in `~/.ssh` instead
-> (`git config --global --unset credential.helper` to back it out).
+> **Scope note.** This lets WSL git read your Windows credential vault for every HTTPS git operation.
+> It includes the `git clone` that Pi itself shells out to for `pi install git:…` sources, so a private
+> git-hosted package installs without further setup. That convenience crosses the WSL/Windows boundary.
+> If you want the two environments isolated, skip this and use a dedicated SSH key in `~/.ssh` instead.
+> To back it out, run `git config --global --unset credential.helper`.
 
 ---
 
@@ -663,7 +693,7 @@ came from GCM rather than from a prompt you did not notice. Drop the variable on
 | Symptom | Cause / fix |
 |---|---|
 | `pi-alibaba-models is installed 2 times; 1 of those would shadow this copy` | npm copy and git copy both configured. Run `pi remove` naming the copy in the error (usually `npm:pi-alibaba-models`) and restart. `PI_ALIBABA_ALLOW_DUPLICATE=1` boots anyway (only useful when comparing versions deliberately). |
-| Long replies cut off mid-sentence, `stopReason: length` (and, downstream, `Context overflow recovery failed: Summarization failed: generation hit the token cap…` at a nearly empty context) | The classic npm-1.1.1 symptom: its hardcoded card `maxTokens: 8192` is split by pi's Anthropic path between thinking (7,168) and answer (~1,024), so anything longer stops with `length`. Because `isRecoverableLength()` only checks `output < maxTokens`, pi misreads that as context pressure and runs overflow recovery — whose summary call gets the same ~1,024-token answer room and fails too. Fix: install the fork (real `max_output_tokens`). Moving Cloud to `openai-responses` helps further, since thinking and answer then share no budget at all. |
+| Long replies cut off mid-sentence, `stopReason: length` (and, downstream, `Context overflow recovery failed: Summarization failed: generation hit the token cap…` at a nearly empty context) | The classic npm-1.1.1 symptom. Its hardcoded card `maxTokens: 8192` is split by pi's Anthropic path between thinking (7,168) and answer (~1,024), so anything longer stops with `length`. `isRecoverableLength()` only checks `output < maxTokens`, so pi misreads that as context pressure and runs overflow recovery. That recovery's summary call gets the same ~1,024-token answer room and fails too. Fix: install the fork (real `max_output_tokens`). Moving Cloud to `openai-responses` helps further, because thinking and answer then share no budget at all. |
 | Every request returns `403` after changing the API key | Old behaviour: endpoint inherited from the previous key. The fork re-derives it; run `/alibaba → Re-login Cloud` then `/login`. |
 | `/alibaba` command missing | `pi list` shows the package? If not, reinstall and restart Pi in a new session. |
 | Model picker shows "No matching models" | Not logged in yet — models register only after a successful Cloud/Plan login (or with `$DASHSCOPE_API_KEY` set). |
@@ -721,7 +751,13 @@ Personal skills load in every project. They are tracked under
 
 ---
 
-*Last updated: 2026-10-28 — listed the `asd-ste100` skill in
+*Last updated: 2026-10-28 — the prose was simplified under the `asd-ste100` skill (ASD-STE100-inspired).
+Long sentences were split and passive constructions rewritten. One stale cross-reference was fixed in
+[`personal-skills/README.md`](./personal-skills/README.md): it pointed at step 12, which is now step 13.
+No command, flag, path, version, or number changed, and no measured claim changed. The verification
+notes below still apply.*
+
+*Earlier (2026-10-28) — listed the `asd-ste100` skill in
 [Project-Local And Personal Skills](#project-local-and-personal-skills), which took the hand-written
 count from two to three. The description was read from `.pi/skills/asd-ste100/SKILL.md` on this
 machine, and the skill was confirmed present in Pi's startup skill list for this project.*
