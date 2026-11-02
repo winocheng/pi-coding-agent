@@ -706,7 +706,7 @@ came from GCM, not from a prompt you did not notice. Drop the variable once it w
 
 ## Project-Local And Personal Skills
 
-This repository also ships three hand-written skills under `.pi/skills/`. Pi loads them automatically
+This repository also ships four hand-written skills under `.pi/skills/`. Pi loads them automatically
 when you work in this project, so there is no install step. (OpenSpec writes six generated skills into
 the same directory — see [step 12](#12-set-up-openspec-for-spec-driven-planning).)
 
@@ -716,6 +716,10 @@ the same directory — see [step 12](#12-set-up-openspec-for-spec-driven-plannin
   and ships no approved-word dictionary
 - **pi-extension-authoring** — designing, writing, and debugging Pi extensions
 - **pi-skill-authoring** — authoring and reviewing Agent Skills (SKILL.md files)
+- **single-file-html-guide** — building one self-contained offline HTML guide: documentation, process
+  explainers, scenario explorers, runbooks, read-only dashboards. It settles facts from source files
+  first, then draws inline-SVG flowcharts and searchable scenarios. Ships a generic starter at
+  `.pi/skills/single-file-html-guide/assets/guide-template.html`
 
 Pi loads a skill when the task matches its description. Force one with `/skill:asd-ste100`. Run
 `/reload` after you edit a skill during an active session.
@@ -751,7 +755,19 @@ Personal skills load in every project. They are tracked under
 
 ---
 
-*Last updated: 2026-10-28 — the prose was simplified under the `asd-ste100` skill (ASD-STE100-inspired).
+*Last updated: 2026-11-03 — added the `single-file-html-guide` skill at
+`.pi/skills/single-file-html-guide/` and listed it in
+[Project-Local And Personal Skills](#project-local-and-personal-skills), which took the hand-written
+count from three to four. It was copied from `~/workspace/note/skills/single-file-html-guide`, which
+keeps its own copy. Its `argument-hint` moved under `metadata`, because Pi ignores unknown top-level
+frontmatter fields and the validator warns on them. Verified on this machine: the skill name appears
+in Pi's startup skill list for this project (`pi -p`, no collision warning); `validate_skill.py`
+reports OK; the `./assets/guide-template.html` link resolves to a tracked file; and the starter has no
+`http(s)://` reference, external `<script src>`, `fetch(` call, or `@import`, with one inline script
+that passes `node --check`. The starter was not rendered in a browser, so its visual layout is
+unverified.*
+
+*Earlier (2026-10-28) — the prose was simplified under the `asd-ste100` skill (ASD-STE100-inspired).
 Long sentences were split and passive constructions rewritten. One stale cross-reference was fixed in
 [`personal-skills/README.md`](./personal-skills/README.md): it pointed at step 12, which is now step 13.
 No command, flag, path, version, or number changed, and no measured claim changed. The verification

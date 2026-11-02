@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Process field guide | Demonstration template</title>
+<style>
+:root {
+  --ink:#202a35; --muted:#586472; --line:#dce1e6;
+  --paper:#fff; --wash:#f4f6f8; --accent:#225e69;
+  --soft:#eaf2f3; --slate:#465564; --radius:14px;
+}
+* { box-sizing:border-box }
+body { margin:0; background:var(--wash); color:var(--ink); font:15px/1.6 system-ui,sans-serif }
+button,input,select { font:inherit }
+a { color:var(--accent) }
+a,button,input,select { outline-offset:4px }
+button { cursor:pointer }
+h1,h2,h3,p { margin-top:0 }
+h1 { font-size:clamp(30px,4vw,48px); line-height:1.13; letter-spacing:-1.3px; margin-bottom:18px }
+h2 { font-size:26px; line-height:1.25; letter-spacing:-.5px }
+h3 { font-size:18px; line-height:1.35 }
+p { margin-bottom:13px }
+[hidden] { display:none!important }
+.muted { color:var(--muted) }
+.small { font-size:12px }
+.eyebrow { color:var(--accent); text-transform:uppercase; letter-spacing:1.8px; font-size:11px; font-weight:750; margin-bottom:12px }
+.skip { position:fixed; top:-80px; left:12px; z-index:10; background:white; padding:12px }
+.skip:focus { top:12px }
+.shell { display:grid; grid-template-columns:230px minmax(0,1fr); min-height:100vh }
+.sidebar { position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:26px; padding:30px 20px; background:white; border-right:1px solid var(--line) }
+.brand { font-size:14px; font-weight:750; letter-spacing:.6px }
+.nav { display:grid; gap:7px }
+.nav a { display:block; padding:11px 12px; border-radius:8px; color:var(--muted); text-decoration:none; font-size:14px }
+.nav a:hover { background:var(--wash) }
+.nav a[aria-current="page"] { color:var(--accent); background:var(--soft); font-weight:700 }
+.sidebar-note { margin-top:auto; padding-top:16px; border-top:1px solid var(--line); color:var(--muted); font-size:12px }
+main { width:100%; max-width:1420px; margin:auto; padding:28px 40px 50px; min-width:0 }
+.topbar { display:flex; justify-content:space-between; align-items:center; gap:12px; border-bottom:1px solid var(--line); padding-bottom:18px; margin-bottom:32px }
+.actions { display:flex; flex-wrap:wrap; gap:8px }
+.btn { padding:8px 13px; border:1px solid var(--line); border-radius:8px; background:white; color:var(--ink); font-size:13px }
+.btn:hover { border-color:var(--slate) }
+.hero { padding:8px 0 20px }
+.lead { font-size:18px; color:var(--muted); max-width:800px }
+.grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px }
+.card { min-width:0; padding:23px; border:1px solid var(--line); border-radius:var(--radius); background:white }
+.card p:last-child { margin-bottom:0 }
+.gap { margin-top:24px }
+.callout { padding:16px 20px; margin:20px 0; border-left:3px solid var(--slate); background:#eef1f4; border-radius:0 10px 10px 0 }
+.callout p { margin:5px 0 0 }
+.explorer { display:grid; grid-template-columns:285px minmax(0,1fr); gap:22px; align-items:start }
+.picker { position:sticky; top:20px }
+.field { width:100%; border:1px solid #b5c0ca; border-radius:8px; padding:10px; background:white; margin:7px 0 12px }
+.choices { display:grid; gap:7px; max-height:58vh; overflow:auto; padding:2px }
+.choice { padding:12px; border:1px solid var(--line); border-radius:9px; text-align:left; background:white; color:var(--ink) }
+.choice b { display:block; font-size:13px }
+.choice[aria-pressed="true"] { border:2px solid var(--accent); padding:11px; background:#f3f8f8 }
+.facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:20px 0 }
+.fact { padding:13px; border:1px solid var(--line); border-radius:8px }
+.fact b { display:block; text-transform:uppercase; letter-spacing:1px; font-size:10px; color:var(--muted); margin-bottom:6px }
+.fact p { font-size:13px; margin:0 }
+.steps { padding-left:22px }
+.steps li { padding:0 0 14px 5px }
+.steps p { margin:3px 0 0; color:var(--muted) }
+.flow { overflow:auto; background:white; border:1px solid var(--line); border-radius:10px }
+.flow svg { display:block; width:100%; height:auto; min-width:780px }
+.legend { display:flex; flex-wrap:wrap; gap:15px; color:var(--muted); font-size:12px; margin:12px 0 }
+.legend span { display:inline-flex; align-items:center; gap:7px }
+.shape { display:inline-block; width:22px; height:15px; border:1px solid #35404b; background:white }
+.shape.round { border-radius:12px; background:#f1f3f5 }
+.shape.diamond { width:12px; height:12px; transform:rotate(45deg); margin:0 5px }
+.node { fill:white; stroke:#35404b; stroke-width:1.25 }
+.terminal { fill:#f1f3f5; stroke:#35404b; stroke-width:1.25 }
+.edge { fill:none; stroke:#46515c; stroke-width:1.4; stroke-linejoin:round }
+.node-text { fill:#202a35; font:16px system-ui,sans-serif; text-anchor:middle }
+.edge-text { fill:#202a35; font:14px system-ui,sans-serif; paint-order:stroke; stroke:white; stroke-width:5px }
+.table-wrap { overflow:auto }
+table { width:100%; border-collapse:collapse; font-size:13px }
+th,td { text-align:left; vertical-align:top; padding:13px; border-bottom:1px solid var(--line) }
+th { color:var(--muted); background:var(--wash); font-size:12px }
+details { border:1px solid var(--line); border-radius:9px; background:white; margin-top:12px }
+summary { padding:15px 18px; cursor:pointer; font-weight:650 }
+details p { padding:0 18px 18px; margin:0 }
+footer { border-top:1px solid var(--line); margin-top:34px; padding-top:18px; color:var(--muted); font-size:12px }
+.print-scenarios { display:none }
+@media(max-width:1100px) {
+  .grid { grid-template-columns:1fr }
+  .explorer { grid-template-columns:1fr }
+  .picker { position:static }
+  .choices { max-height:230px }
+}
+@media(max-width:760px) {
+  .shell { display:block }
+  .sidebar { position:static; height:auto; padding:16px; gap:12px; border-right:0; border-bottom:1px solid var(--line) }
+  .sidebar-note { display:none }
+  .nav { display:flex; overflow:auto; gap:5px }
+  .nav a { white-space:nowrap; padding:8px }
+  main { padding:20px 16px 35px }
+  .topbar { align-items:flex-start }
+  .facts { grid-template-columns:1fr }
+  .card { padding:18px }
+}
+@media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important } }
+@media print {
+  body { background:white; font-size:11px }
+  .shell { display:block }
+  .sidebar,.topbar,.picker,.scenario-detail,.no-print { display:none!important }
+  main { padding:0; max-width:none }
+  .view[hidden] { display:block!important }
+  .view { break-before:page }
+  .view:first-of-type { break-before:auto }
+  .grid,.explorer { display:block }
+  .card { margin-bottom:15px; break-inside:avoid }
+  .print-scenarios { display:block }
+  .print-scenarios article { break-inside:avoid; border-bottom:1px solid #bbb; padding:14px 0 }
+  .flow { overflow:visible; break-inside:avoid }
+  .flow svg { min-width:0; max-height:240mm }
+  h1 { font-size:28px }
+  a { color:inherit }
+}
+</style>
+</head>
+<body>
+<a href="#main" class="skip">Skip to content</a>
+<div class="shell">
+<aside class="sidebar" aria-label="Guide navigation">
+  <div><div class="brand">PROCESS FIELD GUIDE</div><p class="muted small">Generic demonstration template</p></div>
+  <nav class="nav" aria-label="Sections">
+    <a href="#overview" data-route="overview">Start here</a>
+    <a href="#scenarios" data-route="scenarios">Scenario explorer</a>
+    <a href="#workflow" data-route="workflow">Workflow</a>
+    <a href="#reference" data-route="reference">Reference</a>
+  </nav>
+  <div class="sidebar-note">Offline document.<br>No live connections.<br>Replace sample content before delivery.</div>
+</aside>
+<main id="main" tabindex="-1">
+  <div class="topbar"><span class="eyebrow">READ-ONLY GUIDE / DEMONSTRATION</span><div class="actions"><button type="button" class="btn" id="print">Print / save PDF</button><button type="button" class="btn" id="copy">Copy section link</button></div></div>
+  <p id="feedback" role="status" aria-live="polite" class="small muted"></p>
+  <noscript><p class="callout">JavaScript is disabled. Read the static sections below. The interactive explorer requires JavaScript.</p></noscript>
+  <section class="view" id="overview" aria-labelledby="overview-title">
+    <header class="hero"><div class="eyebrow">Explain the process, not just the diagram</div><h1 id="overview-title">What happens, and what changes the outcome?</h1><p class="lead">Replace this fictional example with a source-grounded explanation for business and technical readers.</p></header>
+    <div class="grid">
+      <article class="card"><h3>Understand the purpose</h3><p>Explain what the operation achieves and what remains outside its scope.</p></article>
+      <article class="card"><h3>Follow the decisions</h3><p>Show how entry conditions and saved state determine what actually happens.</p></article>
+      <article class="card"><h3>Choose the next action</h3><p>Make outcomes, exceptions, and the operator's next step explicit.</p></article>
+    </div>
+    <div class="callout"><strong>Demonstration only</strong><p>The sample below models a fictional request check: valid requests are recorded; invalid requests stop without a write. It describes no real system or operational policy.</p></div>
+    <article class="card gap"><h2>Start with the question</h2><p><a href="#scenarios/valid">What happens to a valid request?</a></p><p><a href="#scenarios/invalid">What happens when required information is missing?</a></p><p><a href="#workflow">How do the entry routes and decisions connect?</a></p></article>
+  </section>
+  <section class="view" id="scenarios" aria-labelledby="scenarios-title">
+    <header class="hero"><div class="eyebrow">Conditions and consequences</div><h1 id="scenarios-title">Explore the situations that matter.</h1><p class="lead">Two fictional sample cases demonstrate the component. Replace them with verified scenarios.</p></header>
+    <div class="explorer">
+      <aside class="card picker" aria-label="Scenario selection">
+        <label for="search"><b>Find a scenario</b></label><input id="search" class="field" type="search" placeholder="Search scenarios" autocomplete="off">
+        <label for="category">Category</label><select id="category" class="field"><option value="all">All categories</option></select>
+        <p id="count" class="small muted" role="status"></p><div id="choices" class="choices"></div>
+      </aside>
+      <article class="card scenario-detail" id="detail" aria-live="polite" aria-atomic="true"><p>Choose a scenario when JavaScript is enabled. Both examples are also represented in the workflow below.</p></article>
+    </div>
+    <div id="print-scenarios" class="print-scenarios"></div>
+  </section>
+  <section class="view" id="workflow" aria-labelledby="workflow-title">
+    <header class="hero"><div class="eyebrow">Fictional example</div><h1 id="workflow-title">Separate entries. One decision process.</h1><p class="lead">Either entry independently starts a request check. The process does not wait for both triggers.</p></header>
+    <div class="flow">
+      <svg viewBox="0 0 1000 850" role="img" aria-labelledby="flow-title flow-description">
+        <title id="flow-title">Fictional request validation workflow</title>
+        <desc id="flow-description">An operator-submitted request or an incoming submitted-request event independently starts validation. Complete requests are recorded. Incomplete requests stop without a write. No retry behavior is implied.</desc>
+        <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#46515c"/></marker></defs>
+        <g class="edge" marker-end="url(#arrow)">
+          <path d="M245 130V180H425V225"/><path d="M755 130V180H575V225"/>
+          <path d="M500 315V370"/><path d="M360 440H200V565"/>
+          <path d="M640 440H800V565"/><path d="M800 655V725"/>
+        </g>
+        <rect x="45" y="25" width="400" height="105" rx="52" class="terminal"/>
+        <rect x="555" y="25" width="400" height="105" rx="52" class="terminal"/>
+        <rect x="310" y="225" width="380" height="90" class="node"/>
+        <polygon points="500,370 640,440 500,510 360,440" class="node"/>
+        <rect x="40" y="565" width="320" height="105" rx="14" class="terminal"/>
+        <rect x="640" y="565" width="320" height="90" class="node"/>
+        <rect x="640" y="725" width="320" height="85" rx="14" class="terminal"/>
+        <g class="node-text">
+          <text x="245" y="62"><tspan x="245">Manual submission</tspan><tspan x="245" dy="23">Operator submits one request</tspan><tspan x="245" dy="23">Start request validation</tspan></text>
+          <text x="755" y="62"><tspan x="755">Incoming request event</tspan><tspan x="755" dy="23">A request is submitted</tspan><tspan x="755" dy="23">Start request validation</tspan></text>
+          <text x="500" y="265"><tspan x="500">Read submitted fields</tspan><tspan x="500" dy="23">Check required information</tspan></text>
+          <text x="500" y="434"><tspan x="500">Required fields</tspan><tspan x="500" dy="23">complete?</tspan></text>
+          <text x="200" y="605"><tspan x="200">Stop with validation feedback</tspan><tspan x="200" dy="23">No record is written</tspan></text>
+          <text x="800" y="605"><tspan x="800">Record the valid request</tspan><tspan x="800" dy="23">Preserve submitted information</tspan></text>
+          <text x="800" y="763"><tspan x="800">Request recorded</tspan><tspan x="800" dy="23">Operation complete</tspan></text>
+        </g>
+        <text x="245" y="425" class="edge-text">No</text><text x="735" y="425" class="edge-text">Yes</text>
+      </svg>
+    </div>
+    <div class="legend"><span><i class="shape round"></i>Trigger / outcome</span><span><i class="shape"></i>Automated action</span><span><i class="shape diamond"></i>Decision</span></div>
+    <p class="small muted">Illustrative control flow only. No schedule, approval, retry, or synchronization policy has been added.</p>
+  </section>
+  <section class="view" id="reference" aria-labelledby="reference-title">
+    <header class="hero"><div class="eyebrow">Evidence and limitations</div><h1 id="reference-title">Make the boundaries explicit.</h1><p class="lead">Replace this section with the verified source map, terminology, parameters, and operational limits appropriate to the topic.</p></header>
+    <div class="card table-wrap"><table><caption>Publication readiness checklist</caption><thead><tr><th>Topic</th><th>What to supply</th></tr></thead><tbody><tr><td>Source snapshot</td><td>Identify the actual source revision or date without implying live monitoring.</td></tr><tr><td>Known behavior</td><td>Support consequential decisions, side effects, and recovery claims with evidence.</td></tr><tr><td>Unknown behavior</td><td>State what was not verified rather than filling gaps with invented defaults.</td></tr><tr><td>Privacy</td><td>Remove personal details, credentials, private endpoints, and local paths from public material.</td></tr></tbody></table></div>
+    <details><summary>Is this a live dashboard?</summary><p>No. This template is an offline document. It makes no external requests and displays no live operational status.</p></details>
+    <details><summary>Will printing include every scenario?</summary><p>Yes, when JavaScript is enabled. Print styling includes all sections and all embedded scenario explanations, not just the selected case.</p></details>
+  </section>
+  <footer>Demonstration template. Replace example content and source metadata before publishing a real guide.</footer>
+</main>
+</div>
+<script>
+"use strict";
+const scenarios=[
+  {id:"valid",category:"Normal",title:"A complete request is submitted",entry:"An operator submission or submitted-request event starts validation.",state:"The fictional request includes all required information.",decision:"Accept the request for recording.",steps:[["Validate information","All required fields are present."],["Record request","Write the submitted request."]],outcome:"The request is recorded.",impact:"The submitted information is available in the fictional record store.",action:"No corrective action is required.",caution:"This is sample content, not a real acceptance policy."},
+  {id:"invalid",category:"Exception",title:"Required information is missing",entry:"An operator submission or submitted-request event starts validation.",state:"The fictional request omits required information.",decision:"Reject this attempt before recording.",steps:[["Validate information","Identify the missing required information."],["Stop without a write","Return validation feedback; do not record an incomplete request."]],outcome:"The attempt ends without a new record.",impact:"Existing records are unchanged.",action:"Correct the missing information before making another submission.",caution:"No automatic retry, approval, or correction loop is implied."}
+];
+const routes=["overview","scenarios","workflow","reference"];
+let selected=scenarios[0].id,activeRoute="";
+function el(tag,className,text) { const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node }
+function field(parent,label,value) { const box=el("div","fact");box.append(el("b","",label),el("p","",value));parent.append(box) }
+function listScenarios() {
+  const query=document.getElementById("search").value.trim().toLowerCase();
+  const category=document.getElementById("category").value;
+  const matches=scenarios.filter(s=>(category==="all"||s.category===category)&&JSON.stringify(s).toLowerCase().includes(query));
+  const list=document.getElementById("choices"),scroll=list.scrollTop;list.replaceChildren();
+  for(const s of matches) { const button=el("button","choice");button.type="button";button.dataset.scenario=s.id;button.setAttribute("aria-pressed",String(s.id===selected));button.append(el("b","",s.title),el("span","small muted",s.category));button.addEventListener("click",()=>{location.hash=`scenarios/${s.id}`});list.append(button) }
+  if(!matches.length)list.append(el("p","muted","No matching scenarios. Clear the search or change category."));
+  list.scrollTop=scroll;
+  document.getElementById("count").textContent=`${matches.length} of ${scenarios.length} scenarios`;
+}
+function showScenario(id) {
+  const s=scenarios.find(item=>item.id===id)||scenarios[0];selected=s.id;
+  const detail=document.getElementById("detail");detail.replaceChildren();
+  detail.append(el("div","eyebrow",s.category),el("h2","",s.title));
+  const facts=el("div","facts");field(facts,"Entry",s.entry);field(facts,"Previous state",s.state);field(facts,"Decision",s.decision);field(facts,"Business impact",s.impact);detail.append(facts);
+  const steps=el("ol","steps");for(const [title,text]of s.steps) { const li=el("li");li.append(el("strong","",title),el("p","",text));steps.append(li) }detail.append(steps);
+  detail.append(el("h3","","Expected outcome"),el("p","",s.outcome),el("h3","","Next action"),el("p","",s.action));
+  const note=el("div","callout");note.append(el("strong","","Caution"),el("p","",s.caution));detail.append(note);listScenarios();
+}
+function route() {
+  const [requested,id]=location.hash.slice(1).split("/");
+  const name=routes.includes(requested)?requested:"overview";
+  for(const value of routes)document.getElementById(value).hidden=value!==name;
+  for(const link of document.querySelectorAll(".nav a")) { if(link.dataset.route===name)link.setAttribute("aria-current","page");else link.removeAttribute("aria-current") }
+  if(name==="scenarios")showScenario(id||selected);
+  if(name!==activeRoute) { window.scrollTo(0,0);activeRoute=name }
+  document.title=`${document.querySelector(`#${name} h1`).textContent} | Demonstration guide`;
+}
+function printScenarios() {
+  const target=document.getElementById("print-scenarios");
+  for(const s of scenarios) {
+    const article=el("article");article.append(el("h2","",s.title));
+    const rows=[["Entry",s.entry],["Previous state",s.state],["Decision",s.decision],...s.steps,["Outcome",s.outcome],["Business impact",s.impact],["Next action",s.action],["Caution",s.caution]];
+    for(const [label,text]of rows) { const p=el("p");p.append(el("strong","",`${label}: `),document.createTextNode(text));article.append(p) }target.append(article);
+  }
+}
+for(const category of new Set(scenarios.map(s=>s.category))) { const option=el("option","",category);option.value=category;document.getElementById("category").append(option) }
+document.getElementById("search").addEventListener("input",listScenarios);
+document.getElementById("category").addEventListener("change",listScenarios);
+document.getElementById("print").addEventListener("click",()=>window.print());
+document.getElementById("copy").addEventListener("click",async()=>{
+  const status=document.getElementById("feedback");
+  try { if(!navigator.clipboard)throw new Error("Clipboard unavailable");await navigator.clipboard.writeText(location.href);status.textContent="Link copied. Local-file links require the same file path to be accessible." }
+  catch { status.textContent="Clipboard is unavailable here. Copy the address from the browser's address bar instead." }
+});
+let closedDetails=[];
+window.addEventListener("beforeprint",()=>{closedDetails=[...document.querySelectorAll("details:not([open])")];for(const item of closedDetails)item.open=true});
+window.addEventListener("afterprint",()=>{for(const item of closedDetails)item.open=false;closedDetails=[]});
+window.addEventListener("hashchange",route);
+printScenarios();route();listScenarios();
+</script>
+</body>
+</html>
